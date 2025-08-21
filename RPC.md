@@ -321,27 +321,53 @@ Debug the execution of a transaction, returning trace results.
 ### **Parameters**
 1. `DATA`, 32 Bytes - Hash of a transaction.
 2. `Object` - (optional) Tracer configuration object:
-   * `tracer`: `String` - (optional) Type of tracer. Options: "callTracer", "4byteTracer", "prestateTracer", "noopTracer". Defaults to struct log tracer if not specified.
+   * `tracer`: `String` - (optional) Type of tracer. Options: "callTracer", "4byteTracer", "prestateTracer", "noopTracer". Defaults to struct log tracer (OpCode tracer) if not specified.
    * `tracerConfig`: `Object` - (optional) Additional configuration for the tracer.
    * `disableStorage`: `Boolean` - (optional) Disable storage capture. Default false.
    * `disableMemory`: `Boolean` - (optional) Disable memory capture. Default false.
    * `disableStack`: `Boolean` - (optional) Disable stack capture. Default false.
    * `fullStorage`: `Boolean` - (optional) Return full storage. Default false.
 
+**Note**: The `tracer` field should be a string value, not a nested object. For example, use `"tracer": "callTracer"`, not `"tracer": {"name": "callTracer"}`.
+
 ### **Returns**
 `Object` - Tracer result object (format depends on tracer type):
-  * For default tracer: `Array` of execution step objects with fields like `pc`, `op`, `gas`, `gasCost`, `depth`, `stack`, `memory`, `storage`.
+  * For default tracer (struct logs): Object with `gas`, `failed`, `returnValue`, and `structLogs` array containing execution step objects with fields like `pc`, `op`, `gas`, `gasCost`, `depth`, `stack`, `memory`, `storage`.
   * For callTracer: Call trace object with `type`, `from`, `to`, `gas`, `gasUsed`, `input`, `output`, `calls` (nested calls).
   * For 4byteTracer: Object mapping 4-byte selectors to call counts.
   * For prestateTracer: Object with account states before transaction execution.
 
 ### **Example**
 ```js
-// Request - default tracer
+// Request - default tracer (struct logs)
 curl --data '{"method":"debug_traceTransaction","params":["0xd2df4672d8957825b2b8e832fba14498d449a4e4d5a42c409f6e9c7ab9764446"],"id":1,"jsonrpc":"2.0"}' -H "Content-Type: application/json" -X POST localhost:8765
 
 // Request - with callTracer
 curl --data '{"method":"debug_traceTransaction","params":["0xd2df4672d8957825b2b8e832fba14498d449a4e4d5a42c409f6e9c7ab9764446",{"tracer":"callTracer"}],"id":1,"jsonrpc":"2.0"}' -H "Content-Type: application/json" -X POST localhost:8765
+
+// Request - with options for default tracer
+curl --data '{"method":"debug_traceTransaction","params":["0xd2df4672d8957825b2b8e832fba14498d449a4e4d5a42c409f6e9c7ab9764446",{"disableStorage":true,"enableMemory":false}],"id":1,"jsonrpc":"2.0"}' -H "Content-Type: application/json" -X POST localhost:8765
+
+// Result (default tracer example)
+{
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": {
+        "gas": 21000,
+        "failed": false,
+        "returnValue": "",
+        "structLogs": [
+            {
+                "pc": 0,
+                "op": "PUSH1",
+                "gas": 30400,
+                "gasCost": 3,
+                "depth": 1,
+                "stack": ["0x60"]
+            }
+        ]
+    }
+}
 
 // Result (callTracer example)
 {

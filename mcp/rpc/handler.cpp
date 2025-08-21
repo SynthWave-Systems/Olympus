@@ -1643,16 +1643,22 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	if (params.size() > 1 && !params[1].is_null())
 		tracer_config = params[1];
 
-	LocalisedTransaction t = client()->localisedTransaction(jsToHash(params[0]));
-	Block block = client()->blockByHash(t.blockHash(),true);
-	chain_state s(chain_state::Null);
-	mcp::ExecutionResult er;
-	std::shared_ptr<Tracer> _tracer = NewTracer(tracer_config, er);
-	Executive e(s, block, t.transactionIndex(), client()->blockChain(), _tracer);
-	e.setResultRecipient(er);
-	traceTransaction(e, t);
+	try {
+		LocalisedTransaction t = client()->localisedTransaction(jsToHash(params[0]));
+		Block block = client()->blockByHash(t.blockHash(),true);
+		chain_state s(chain_state::Null);
+		mcp::ExecutionResult er;
+		std::shared_ptr<Tracer> _tracer = NewTracer(tracer_config, er);
+		Executive e(s, block, t.transactionIndex(), client()->blockChain(), _tracer);
+		e.setResultRecipient(er);
+		traceTransaction(e, t);
 
-	j_response["result"] = _tracer->GetResult();
+		j_response["result"] = _tracer->GetResult();
+	}
+	catch (std::exception const& ex) {
+		// If transaction not found or other error, throw appropriate RPC error
+		BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Transaction not found or could not be traced"));
+	}
 }
 
 void mcp::rpc_handler::traceTransaction(mcp::Executive& _e, mcp::Transaction const& _t)
