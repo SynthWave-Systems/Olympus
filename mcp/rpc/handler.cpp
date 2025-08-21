@@ -1638,20 +1638,20 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	if (!mcp::isH256(params[0]))
 		BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
 
+	// Handle optional tracer config parameter
+	mcp::json tracer_config = mcp::json::object();
+	if (params.size() > 1 && !params[1].is_null())
+		tracer_config = params[1];
+
 	LocalisedTransaction t = client()->localisedTransaction(jsToHash(params[0]));
 	Block block = client()->blockByHash(t.blockHash(),true);
 	chain_state s(chain_state::Null);
 	mcp::ExecutionResult er;
-	std::shared_ptr<Tracer> _tracer = NewTracer(params[1], er);
+	std::shared_ptr<Tracer> _tracer = NewTracer(tracer_config, er);
 	Executive e(s, block, t.transactionIndex(), client()->blockChain(), _tracer);
 	e.setResultRecipient(er);
 	traceTransaction(e, t);
 
-	//mcp::json ret;
-	//ret["gas"] = t.gas().convert_to<uint64_t>()/*toJS(t.gas())*/;
-	//ret["failed"] = er.Failed();
-	//ret["returnValue"] = toHex(er.output);
-	//ret["structLogs"] = trace;
 	j_response["result"] = _tracer->GetResult();
 }
 
