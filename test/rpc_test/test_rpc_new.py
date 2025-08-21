@@ -970,6 +970,52 @@ class Test_rpc(unittest.TestCase):
         json_data = json.loads(response.text)
         self.assertEqual(json_data['code'], 1, json_data['msg'])
 
+    def test_debug_traceTransaction(self):
+        # Test with default tracer (OpCode)
+        data = {
+            "method": "debug_traceTransaction",
+            "params": [Test_rpc.transaction_hash],
+            "id": 1,
+            "jsonrpc": "2.0",
+        }
+        response = requests.post(url=URL, data=json.dumps(data))
+        self.assertEqual(response.status_code, 200)
+        is_json, json_data = try_load_json(response.text)
+        self.assertTrue(is_json, response.text)
+        print("Default tracer result:", json_data)
+        self.assertIn('result', json_data)
+        print("\n")
+
+        # Test with specific tracer options
+        data_with_config = {
+            "method": "debug_traceTransaction",
+            "params": [Test_rpc.transaction_hash, {"tracer": "callTracer"}],
+            "id": 1,
+            "jsonrpc": "2.0",
+        }
+        response = requests.post(url=URL, data=json.dumps(data_with_config))
+        self.assertEqual(response.status_code, 200)
+        is_json, json_data = try_load_json(response.text)
+        self.assertTrue(is_json, response.text)
+        print("CallTracer result:", json_data)
+        self.assertIn('result', json_data)
+        print("\n")
+
+        # Test with invalid transaction hash
+        bad_data = {
+            "method": "debug_traceTransaction",
+            "params": ["0xinvalidhash"],
+            "id": 1,
+            "jsonrpc": "2.0",
+        }
+        response = requests.post(url=URL, data=json.dumps(bad_data))
+        self.assertEqual(response.status_code, 200)
+        is_json, json_data = try_load_json(response.text)
+        self.assertTrue(is_json, response.text)
+        print("Invalid hash result:", json_data)
+        # Should return an error or null result
+        print("\n")
+
     def test_eth_blockNumber(self):
         data = {
             "method": "eth_blockNumber",
@@ -2222,6 +2268,7 @@ if __name__ == "__main__":
     suite.addTest(Test_rpc("test_nodes"))
     # suite.addTest(Test_rpc("test_logs"))
     suite.addTest(Test_rpc("test_debug_storage_range_at"))
+    suite.addTest(Test_rpc("test_debug_traceTransaction"))
     suite.addTest(Test_rpc("test_account_remove"))
     suite.addTest(Test_rpc("test_eth_blockNumber"))
     suite.addTest(Test_rpc("test_eth_getTransactionCount"))
