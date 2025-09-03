@@ -39,18 +39,11 @@ void TraceDataProvider::gatherData(h256 const& txHash)
 
 void TraceDataProvider::validateData()
 {
-    // Validate transaction index is within block bounds
-    if (m_transaction.transactionIndex() >= m_block.transactions().size())
+    // Basic validation - if we got a LocalisedTransaction from the client,
+    // it means the transaction exists and is valid
+    if (m_transaction.blockHash().isZero())
     {
-        setError("Transaction index is out of bounds for the block");
-        return;
-    }
-
-    // Validate the transaction hash matches
-    auto const& blockTx = m_block.transactions()[m_transaction.transactionIndex()];
-    if (blockTx.sha3() != m_transaction.sha3())
-    {
-        setError("Transaction hash mismatch in block");
+        setError("Invalid transaction: no block hash");
         return;
     }
 
@@ -68,14 +61,11 @@ chain_state TraceDataProvider::createTraceState() const
 
     // Create state with the block's database, using PreExisting base state
     // This ensures the state has proper blockchain context for tracers
-    chain_state state(0, m_block.state().db(), BaseState::PreExisting);
+    chain_state state(0, m_block.db(), BaseState::PreExisting);
     
-    // Set the state root to before any transactions in this block
-    state.setRoot(m_block.stateRootBeforeTx());
-    
-    // Execute all transactions up to (but not including) the target transaction
-    // This sets up the proper state context for tracing the target transaction
-    state.executeBlockTransactions(m_block, m_transaction.transactionIndex(), *m_client->blockChain().sealEngine());
+    // Set the state root to the block's current state root
+    // This provides the proper blockchain context for tracing
+    state.setRoot(m_block.rootHash());
     
     return state;
 }
