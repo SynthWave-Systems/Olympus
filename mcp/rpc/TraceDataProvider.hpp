@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <optional>
 #include <mcp/core/common.hpp>
 #include <mcp/node/chain_state.hpp>
 #include <mcp/node/Block.hpp>
@@ -37,7 +38,7 @@ namespace mcp
          * @brief Get the block containing the transaction
          * @return Const reference to the block
          */
-        Block const& getBlock() const { return m_block; }
+        Block const& getBlock() const { return m_block.value(); }
 
         /**
          * @brief Create a properly initialized chain_state for tracing
@@ -66,7 +67,7 @@ namespace mcp
     private:
         std::shared_ptr<Client> m_client;
         LocalisedTransaction m_transaction;
-        Block m_block;
+        std::optional<Block> m_block;
         bool m_isValid;
         std::string m_errorMessage;
 

@@ -47,6 +47,13 @@ void TraceDataProvider::validateData()
         return;
     }
 
+    // Check that we have a valid block
+    if (!m_block.has_value())
+    {
+        setError("Invalid block: could not retrieve block data");
+        return;
+    }
+
     // If we get here, everything is valid
     m_isValid = true;
     m_errorMessage.clear();
@@ -59,13 +66,18 @@ chain_state TraceDataProvider::createTraceState() const
         throw std::runtime_error("Cannot create trace state: " + m_errorMessage);
     }
 
+    if (!m_block.has_value())
+    {
+        throw std::runtime_error("Cannot create trace state: no block data available");
+    }
+
     // Create state with the block's database, using PreExisting base state
     // This ensures the state has proper blockchain context for tracers
-    chain_state state(0, m_block.db(), BaseState::PreExisting);
+    chain_state state(0, m_block->db(), BaseState::PreExisting);
     
     // Set the state root to the block's current state root
     // This provides the proper blockchain context for tracing
-    state.setRoot(m_block.rootHash());
+    state.setRoot(m_block->rootHash());
     
     return state;
 }
