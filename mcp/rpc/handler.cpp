@@ -1,6 +1,7 @@
 #include "handler.hpp"
 #include "exceptions.hpp"
 #include "jsonHelper.hpp"
+#include "TraceDataProvider.hpp"
 #include <mcp/core/genesis.hpp>
 #include <mcp/core/param.hpp>
 #include <mcp/common/pwd.hpp>
@@ -1639,25 +1640,29 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	if (!mcp::isH256(params[0]))
 		BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
 
-	LocalisedTransaction t = client()->localisedTransaction(jsToHash(params[0]));
-	Block block = client()->blockByHash(t.blockHash(),true);
+	// Create trace data provider to gather and validate blockchain data
+	TraceDataProvider dataProvider(client(), jsToHash(params[0]));
 	
-	// Create state with the block's database, not empty state
-	chain_state s(0, block.state().db(), BaseState::PreExisting);
+	if (!dataProvider.isValid())
+	{
+		BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams(dataProvider.getErrorMessage().c_str()));
+	}
+
+	// Get the gathered data
+	LocalisedTransaction const& t = dataProvider.getTransaction();
+	Block const& block = dataProvider.getBlock();
+	
+	// Create properly initialized state for tracing
+	chain_state s = dataProvider.createTraceState();
 	
 	mcp::ExecutionResult er;
 	// Handle optional second parameter for tracer config
 	mcp::json tracerConfig = (params.size() > 1 && !params[1].is_null()) ? params[1] : mcp::json::object();
 	std::shared_ptr<Tracer> _tracer = NewTracer(tracerConfig, er);
-	Executive e(s, block, t.transactionIndex(), client()->blockChain(), _tracer);
+	Executive e(s, block, t.transactionIndex(), dataProvider.getClient()->blockChain(), _tracer);
 	e.setResultRecipient(er);
 	traceTransaction(e, t);
 
-	//mcp::json ret;
-	//ret["gas"] = t.gas().convert_to<uint64_t>()/*toJS(t.gas())*/;
-	//ret["failed"] = er.Failed();
-	//ret["returnValue"] = toHex(er.output);
-	//ret["structLogs"] = trace;
 	j_response["result"] = _tracer->GetResult();
 }
 
