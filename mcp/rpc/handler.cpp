@@ -5,6 +5,7 @@
 #include <mcp/core/param.hpp>
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
+#include <mcp/node/chain_state.hpp>
 //#include <mcp/node/debug.hpp>
 //#include <mcp/node/tracers/OpCode.hpp>
 
@@ -1640,7 +1641,11 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 
 	LocalisedTransaction t = client()->localisedTransaction(jsToHash(params[0]));
 	Block block = client()->blockByHash(t.blockHash(),true);
-	chain_state s(chain_state::Null);
+	
+	// Create proper state for the transaction - use the existing createIntermediateState method
+	chain_state s = block.state();
+	createIntermediateState(s, block, t.transactionIndex(), client()->blockChain());
+	
 	mcp::ExecutionResult er;
 	std::shared_ptr<Tracer> _tracer = NewTracer(params[1], er);
 	Executive e(s, block, t.transactionIndex(), client()->blockChain(), _tracer);
