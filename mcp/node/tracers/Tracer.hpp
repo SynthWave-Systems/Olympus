@@ -3,6 +3,7 @@
 #include <libevm/VMFace.h>
 #include <libevm/Logger.h>
 #include <mcp/core/common.hpp>
+#include "OPExecutionRecord.hpp"
 
 namespace mcp
 {
@@ -30,6 +31,20 @@ namespace mcp
 
 		virtual mcp::json GetResult() { return mcp::json::object(); }
 
+		/**
+		 * @brief Set the execution record for this tracer
+		 * @param record Shared pointer to the execution record
+		 */
+		virtual void SetExecutionRecord(std::shared_ptr<OPExecutionRecord> record) { m_executionRecord = record; }
+
+		/**
+		 * @brief Get the execution record for this tracer
+		 * @return Shared pointer to the execution record
+		 */
+		std::shared_ptr<OPExecutionRecord> GetExecutionRecord() const { return m_executionRecord; }
+
+	protected:
+		std::shared_ptr<OPExecutionRecord> m_executionRecord;
 	};
 
 	std::shared_ptr<Tracer> NewTracer(mcp::json const& _param, mcp::ExecutionResult& _er);

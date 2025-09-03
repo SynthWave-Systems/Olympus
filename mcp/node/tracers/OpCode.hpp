@@ -20,10 +20,16 @@ namespace mcp
 		explicit OpCode(mcp::ExecutionResult& _er, mcp::json const& _param = mcp::json()) noexcept :
 			//Tracer(_er),
 			m_res{ &_er },
-			m_options(debugOptions(_param)) {}
+			m_options(debugOptions(_param)) 
+		{
+			// Initialize execution record for this tracer
+			m_executionRecord = std::make_shared<OPExecutionRecord>();
+		}
 
 		void CaptureState(uint64_t PC, dev::eth::Instruction inst,
 			uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt) override;
+
+		void CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted) override;
 
 		mcp::json GetResult() override;
 
