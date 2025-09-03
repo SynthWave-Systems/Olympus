@@ -10,6 +10,13 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	if (m_options.limit != 0 && m_options.limit <= m_outValue.size())
 		return;
 
+	// Also capture in the execution record for structured access
+	if (m_executionRecord)
+	{
+		m_executionRecord->captureStep(PC, inst, gasCost, gas, _vm, voidExt, 
+									   m_options.enableMemory, !m_options.disableStorage);
+	}
+
 	ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
 	auto vm = dynamic_cast<LegacyVM const*>(_vm);
 
@@ -98,6 +105,18 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	}
 
 	m_outValue.push_back(r);
+}
+
+void mcp::OpCode::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
+{
+	// Update the execution record with final transaction data
+	if (m_executionRecord)
+	{
+		m_executionRecord->output = _output;
+		m_executionRecord->totalGasUsed = _gasUsed;
+		m_executionRecord->failed = (_excepted != mcp::TransactionException::None);
+		m_executionRecord->exception = _excepted;
+	}
 }
 
 mcp::json mcp::OpCode::GetResult()

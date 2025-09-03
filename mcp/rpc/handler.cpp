@@ -7,6 +7,7 @@
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
 #include <mcp/node/chain_state.hpp>
+#include <mcp/node/tracers/OPExecutionRecord.hpp>
 //#include <mcp/node/debug.hpp>
 //#include <mcp/node/tracers/OpCode.hpp>
 
@@ -1659,6 +1660,11 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	// Handle optional second parameter for tracer config
 	mcp::json tracerConfig = (params.size() > 1 && !params[1].is_null()) ? params[1] : mcp::json::object();
 	std::shared_ptr<Tracer> _tracer = NewTracer(tracerConfig, er);
+	
+	// Create an execution record that will be shared with tracers
+	std::shared_ptr<OPExecutionRecord> executionRecord = std::make_shared<OPExecutionRecord>();
+	_tracer->SetExecutionRecord(executionRecord);
+	
 	Executive e(s, block, t.transactionIndex(), dataProvider.getClient()->blockChain(), _tracer);
 	e.setResultRecipient(er);
 	traceTransaction(e, t);

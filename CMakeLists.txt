@@ -265,6 +265,10 @@ FILE(GLOB NODE_TRACE_SOURCES
 	mcp/node/tracers/Call.cpp
 	mcp/node/tracers/PreState.hpp
 	mcp/node/tracers/PreState.cpp
+	mcp/node/tracers/OPExecutionRecord.hpp
+	mcp/node/tracers/OPExecutionRecord.cpp
+	mcp/node/tracers/ExecutionRecordTracer.hpp
+	mcp/node/tracers/ExecutionRecordTracer.cpp
 )
 SOURCE_GROUP(tracers FILES ${NODE_TRACE_SOURCES})
 
@@ -354,6 +358,8 @@ add_library (rpc
 	mcp/rpc/json.cpp
 	mcp/rpc/json.hpp
 	mcp/rpc/exceptions.hpp
+	mcp/rpc/TraceDataProvider.cpp
+	mcp/rpc/TraceDataProvider.hpp
 	)
 	
 add_library (wallet
