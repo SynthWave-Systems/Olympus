@@ -1642,8 +1642,8 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	LocalisedTransaction t = client()->localisedTransaction(jsToHash(params[0]));
 	Block block = client()->blockByHash(t.blockHash(),true);
 	
-	// Use the block's state - the Executive constructor will handle setting up the intermediate state
-	chain_state s = block.state();
+	// Create state with the block's database, not empty state
+	chain_state s(0, block.state().db(), BaseState::PreExisting);
 	
 	mcp::ExecutionResult er;
 	// Handle optional second parameter for tracer config
