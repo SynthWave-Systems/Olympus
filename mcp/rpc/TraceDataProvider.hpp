@@ -4,7 +4,7 @@
 #include <string>
 #include <mcp/core/common.hpp>
 #include <mcp/node/chain_state.hpp>
-#include <mcp/core/block.hpp>
+#include <mcp/node/Block.hpp>
 #include <mcp/core/transaction.hpp>
 
 namespace mcp
