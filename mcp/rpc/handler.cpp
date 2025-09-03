@@ -1642,12 +1642,13 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	LocalisedTransaction t = client()->localisedTransaction(jsToHash(params[0]));
 	Block block = client()->blockByHash(t.blockHash(),true);
 	
-	// Create proper state for the transaction - use the existing createIntermediateState method
+	// Use the block's state - the Executive constructor will handle setting up the intermediate state
 	chain_state s = block.state();
-	createIntermediateState(s, block, t.transactionIndex(), client()->blockChain());
 	
 	mcp::ExecutionResult er;
-	std::shared_ptr<Tracer> _tracer = NewTracer(params[1], er);
+	// Handle optional second parameter for tracer config
+	mcp::json tracerConfig = (params.size() > 1 && !params[1].is_null()) ? params[1] : mcp::json::object();
+	std::shared_ptr<Tracer> _tracer = NewTracer(tracerConfig, er);
 	Executive e(s, block, t.transactionIndex(), client()->blockChain(), _tracer);
 	e.setResultRecipient(er);
 	traceTransaction(e, t);
