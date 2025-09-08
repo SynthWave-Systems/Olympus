@@ -12,6 +12,8 @@
 #include <evmc/instructions.h>
 
 #include <boost/optional.hpp>
+#include <functional>
+#include <string>
 
 namespace dev
 {
@@ -46,6 +48,12 @@ struct VMSchedule
     static constexpr int64_t callSelfGas = 40;
 };
 
+// Callback type for logging opcodes during execution
+using OpcodeLogCallback = std::function<void(uint64_t pc, Instruction op, const std::string& opName)>;
+
+// Global callback for opcode logging - can be set by Executive
+extern OpcodeLogCallback g_opcodeLogCallback;
+
 class VM
 {
 public:
@@ -56,6 +64,9 @@ public:
     owning_bytes_ref exec(const evmc_host_interface* _host, evmc_host_context* _context,
         evmc_revision _rev, const evmc_message* _msg, uint8_t const* _code, size_t _codeSize);
 
+    // Set opcode logging callback for debugging
+    void setOpcodeLogCallback(const OpcodeLogCallback& callback) { m_opcodeLogCallback = callback; }
+
     uint64_t m_io_gas = 0;
 private:
     const evmc_host_interface* m_host = nullptr;
@@ -65,6 +76,9 @@ private:
     evmc_message const* m_message = nullptr;
     boost::optional<evmc_tx_context> m_tx_context;
     static std::array<std::array<evmc_instruction_metrics, 256>, EVMC_MAX_REVISION + 1> s_metrics;
+    
+    // Opcode logging callback
+    OpcodeLogCallback m_opcodeLogCallback;
     void copyCode(int);
     typedef void (VM::*MemFnPtr)();
     MemFnPtr m_bounce = nullptr;
@@ -133,7 +147,16 @@ private:
     std::vector<uint64_t> m_jumpDests;
     int64_t verifyJumpDest(intx::uint256 const& _dest, bool _throw = true);
 
-    void onOperation() {}
+    void onOperation() {
+        // Try instance callback first, then global callback
+        if (m_opcodeLogCallback) {
+            std::string opName = getInstructionName(m_OP);
+            m_opcodeLogCallback(m_PC, m_OP, opName);
+        } else if (g_opcodeLogCallback) {
+            std::string opName = getInstructionName(m_OP);
+            g_opcodeLogCallback(m_PC, m_OP, opName);
+        }
+    }
     void adjustStack(int _removed, int _added);
     uint64_t gasForMem(intx::uint512 const& _size);
     void updateIOGas();
@@ -141,6 +164,8 @@ private:
     void updateMem(uint64_t _newMem);
     void logGasMem();
     void fetchInstruction();
+    
+    std::string getInstructionName(Instruction inst) const;
     
     uint64_t decodeJumpDest(const byte* const _code, uint64_t& _pc);
     uint64_t decodeJumpvDest(const byte* const _code, uint64_t& _pc, byte _voff);
