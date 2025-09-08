@@ -12,6 +12,7 @@
 #include <evmc/instructions.h>
 
 #include <boost/optional.hpp>
+#include <functional>
 
 namespace dev
 {
@@ -57,6 +58,9 @@ public:
         evmc_revision _rev, const evmc_message* _msg, uint8_t const* _code, size_t _codeSize);
 
     uint64_t m_io_gas = 0;
+
+    using OperationTracer = std::function<void(uint64_t, Instruction)>;
+    void setOperationTracer(OperationTracer tracer) { m_operationTracer = std::move(tracer); }
 private:
     const evmc_host_interface* m_host = nullptr;
     evmc_host_context* m_context = nullptr;
@@ -69,6 +73,8 @@ private:
     typedef void (VM::*MemFnPtr)();
     MemFnPtr m_bounce = nullptr;
     uint64_t m_nSteps = 0;
+
+    OperationTracer m_operationTracer;
 
     // return bytes
     owning_bytes_ref m_output;
@@ -133,7 +139,7 @@ private:
     std::vector<uint64_t> m_jumpDests;
     int64_t verifyJumpDest(intx::uint256 const& _dest, bool _throw = true);
 
-    void onOperation() {}
+    void onOperation() { if (m_operationTracer) m_operationTracer(m_PC, m_OP); }
     void adjustStack(int _removed, int _added);
     uint64_t gasForMem(intx::uint512 const& _size);
     void updateIOGas();
@@ -153,7 +159,7 @@ private:
         uint64_t w = uint64_t(v);
         return w;
     }
-    
+
     template<class T> uint64_t toInt15(T v)
     {
         // check for overflow

@@ -3,6 +3,7 @@
 
 #include <libevm/LegacyVM.h>
 #include <libevm/VMFactory.h>
+#include <libinterpreter/VM.h>
 #include <mcp/common/Exceptions.h>
 #include <mcp/common/stopwatch.hpp>
 #include <mcp/core/param.hpp>
@@ -335,9 +336,15 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 
             // Create VM instance. Force Interpreter if tracing requested.
             auto vm = VMFactory::create();
+            if (auto* intVm = dynamic_cast<dev::eth::VM*>(vm.get()))
+            {
+                intVm->setOperationTracer([&](uint64_t pc, dev::eth::Instruction inst) {
+                    BOOST_LOG(m_log.trace) << pc << ": " << instructionInfo(inst).name;
+                });
+            }
             if (m_isCreation)
             {
-				m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
+                                m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
                 if (m_res)
                 {
                     m_res->gasForDeposit = m_gas;
