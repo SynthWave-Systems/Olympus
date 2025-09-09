@@ -337,7 +337,8 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 
             // Set up opcode logging callback for debugging
             g_opcodeLogCallback = [this](uint64_t pc, Instruction op, const std::string& opName) {
-                BOOST_LOG(m_log.trace) << "EVM Opcode: PC=" << pc << " OP=" << opName 
+                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
+                                      << " PC=" << pc << " OP=" << opName 
                                       << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
             };
 
