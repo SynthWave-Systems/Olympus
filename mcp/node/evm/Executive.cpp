@@ -349,7 +349,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                     try {
                         // Cast VM to VMFace for tracer interface
                         const VMFace* vmFace = dynamic_cast<const VMFace*>(vm);
-                        m_tracer->CaptureState(pc, op, 0, m_gas, vmFace, m_ext.get());
+                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), vmFace, m_ext.get());
                     } catch (...) {
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
