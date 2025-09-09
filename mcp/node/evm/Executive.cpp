@@ -14,6 +14,7 @@
 using namespace std;
 using namespace dev;
 using namespace dev::eth;
+using namespace dev::eth;
 
 namespace
 {
@@ -336,18 +337,19 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//int64_t start_refunds = m_ext->sub.refunds;
 
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = [this](uint64_t pc, Instruction op, const std::string& opName) {
+            g_opcodeLogCallback = [this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
                 // Log to BOOST_LOG for debugging output
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
                                       << " PC=" << pc << " OP=" << opName 
                                       << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
                 
                 // Connect to shared_ptr tracer for structured tracing
-                if (m_tracer) {
-                    // Note: For complete integration, we'd need access to VM and gas cost
-                    // This provides basic opcode tracing through the shared_ptr tracer
+                if (m_tracer && vm && m_ext) {
+                    // Now we have access to VM instance and can provide more context
                     try {
-                        m_tracer->CaptureState(pc, op, 0, m_gas, nullptr, m_ext.get());
+                        // Cast VM to VMFace for tracer interface
+                        const VMFace* vmFace = dynamic_cast<const VMFace*>(vm);
+                        m_tracer->CaptureState(pc, op, 0, m_gas, vmFace, m_ext.get());
                     } catch (...) {
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;

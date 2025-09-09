@@ -48,8 +48,8 @@ struct VMSchedule
     static constexpr int64_t callSelfGas = 40;
 };
 
-// Callback type for logging opcodes during execution
-using OpcodeLogCallback = std::function<void(uint64_t pc, Instruction op, const std::string& opName)>;
+// Callback type for logging opcodes during execution with enhanced context
+using OpcodeLogCallback = std::function<void(uint64_t pc, Instruction op, const std::string& opName, const VM* vm)>;
 
 // Global callback for opcode logging - can be set by Executive
 extern OpcodeLogCallback g_opcodeLogCallback;
@@ -148,13 +148,13 @@ private:
     int64_t verifyJumpDest(intx::uint256 const& _dest, bool _throw = true);
 
     void onOperation() {
-        // Try instance callback first, then global callback
+        // Try instance callback first, then global callback with VM context
         if (m_opcodeLogCallback) {
             std::string opName = getInstructionName(m_OP);
-            m_opcodeLogCallback(m_PC, m_OP, opName);
+            m_opcodeLogCallback(m_PC, m_OP, opName, this);
         } else if (g_opcodeLogCallback) {
             std::string opName = getInstructionName(m_OP);
-            g_opcodeLogCallback(m_PC, m_OP, opName);
+            g_opcodeLogCallback(m_PC, m_OP, opName, this);
         }
     }
     void adjustStack(int _removed, int _added);
