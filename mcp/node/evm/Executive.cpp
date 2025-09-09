@@ -344,12 +344,11 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                                       << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
                 
                 // Connect to shared_ptr tracer for structured tracing
-                if (m_tracer && vm && m_ext) {
-                    // Now we have access to VM instance and can provide more context
+                if (m_tracer && m_ext) {
+                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
+                    // The tracer should handle this gracefully
                     try {
-                        // Cast VM to VMFace for tracer interface
-                        const VMFace* vmFace = dynamic_cast<const VMFace*>(vm);
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), vmFace, m_ext.get());
+                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
                     } catch (...) {
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
