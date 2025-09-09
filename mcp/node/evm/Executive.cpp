@@ -337,7 +337,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//int64_t start_refunds = m_ext->sub.refunds;
 
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = [this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
+            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
                 // Log to BOOST_LOG for debugging output
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
                                       << " PC=" << pc << " OP=" << opName 
@@ -354,7 +354,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
                     }
                 }
-            };
+            });
 
             // Create VM instance. Force Interpreter if tracing requested.
             auto vm = VMFactory::create();
