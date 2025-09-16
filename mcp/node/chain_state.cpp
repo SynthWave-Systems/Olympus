@@ -144,13 +144,30 @@ bool mcp::chain_state::addressInUse(Address const& _address) const
 bool mcp::chain_state::executeTransaction(Executive& _e, dev::eth::OnOpFunc const& _onOp)
 {
 	size_t const savept = savepoint();
+	
+	// Client API-level tracing for complete execution path debugging
+	LOG(m_log.debug) << "Client API: Starting transaction execution"
+	                 << " TxHash=" << ts.sha3().hexPrefixed()
+	                 << " From=" << ts.sender().hexPrefixed() 
+	                 << " To=" << ts.to().hexPrefixed()
+	                 << " Value=" << ts.value();
+	
 	try
 	{
 		_e.initialize(ts);
 
 		if (!_e.execute())
 			_e.go(_onOp);
-		return _e.finalize();
+		
+		bool result = _e.finalize();
+		
+		// Client API-level completion tracing
+		LOG(m_log.debug) << "Client API: Transaction execution completed"
+		                 << " TxHash=" << ts.sha3().hexPrefixed()
+		                 << " Result=" << (result ? "SUCCESS" : "FAILED")
+		                 << " GasUsed=" << _e.gasUsed();
+		
+		return result;
 	}
     catch (dev::eth::NotEnoughCash const&)
     {

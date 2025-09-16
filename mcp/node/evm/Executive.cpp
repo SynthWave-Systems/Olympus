@@ -318,13 +318,15 @@ bool mcp::Executive::go(dev::eth::OnOpFunc const& _onOp)
 
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
             g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
-                // Log to BOOST_LOG for debugging output
+                // Enhanced logging with block-level context for complete traceability
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
+                                      << " BlockNum=" << m_envInfo.number()
                                       << " PC=" << pc << " OP=" << opName 
-                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
+                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")"
+                                      << " Depth=" << (m_ext ? m_ext->depth : 0);
                 
-                // TODO: Connect to shared_ptr tracer for structured tracing if available
-                // This would require tracer integration which can be added later
+                // TODO: Add state root and additional block context for MPT debugging
+                // This provides complete execution path debugging from API calls to VM opcodes
             });
 
             // Create VM instance. Force Interpreter if tracing requested.
