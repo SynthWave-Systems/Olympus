@@ -3,10 +3,13 @@
 
 #include <libevm/LegacyVM.h>
 #include <libevm/VMFactory.h>
+#include <libinterpreter/VM.h>
 #include <mcp/common/Exceptions.h>
 #include <mcp/common/stopwatch.hpp>
-
+#include <mcp/core/param.hpp>
+#include <mcp/node/chain.hpp>
 #include <numeric>
+#include <iomanip>
 
 using namespace std;
 using namespace dev;
@@ -313,6 +316,17 @@ bool mcp::Executive::go(dev::eth::OnOpFunc const& _onOp)
 			mcp::uint256_t start_gas_used = gasUsed();
 			int64_t start_refunds = m_ext->sub.refunds;
 
+            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
+            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
+                // Log to BOOST_LOG for debugging output
+                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
+                                      << " PC=" << pc << " OP=" << opName 
+                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
+                
+                // TODO: Connect to shared_ptr tracer for structured tracing if available
+                // This would require tracer integration which can be added later
+            });
+
             // Create VM instance. Force Interpreter if tracing requested.
             auto vm = VMFactory::create();
             if (m_isCreation)
@@ -425,6 +439,9 @@ bool mcp::Executive::go(dev::eth::OnOpFunc const& _onOp)
 #if ETH_TIMED_EXECUTIONS
         cnote << "VM took:" << t.elapsed() << "; gas used: " << (sgas - m_endGas);
 #endif
+        
+        // Clear the opcode logging callback
+        g_opcodeLogCallback = nullptr;
     }
     return true;
 }

@@ -5,6 +5,7 @@
 #include <mcp/core/param.hpp>
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
+#include <mcp/node/debug.hpp>
 
 mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::function<void(mcp::json const &)> const &response_a, int m_cap) : body(body_a),
 																																				 rpc(rpc_a),
@@ -69,7 +70,7 @@ mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::f
 	m_ethRpcMethods["eth_accounts"] = &mcp::rpc_handler::eth_accounts;
 	m_ethRpcMethods["eth_sign"] = &mcp::rpc_handler::eth_sign;
 	m_ethRpcMethods["eth_signTransaction"] = &mcp::rpc_handler::eth_signTransaction;
-	//m_ethRpcMethods["debug_traceTransaction"] = &mcp::rpc_handler::debug_traceTransaction;
+	m_ethRpcMethods["debug_traceTransaction"] = &mcp::rpc_handler::debug_traceTransaction;
 	//m_ethRpcMethods["debug_storageRangeAt"] = &mcp::rpc_handler::debug_storageRangeAt;
 
 	m_ethRpcMethods["personal_importRawKey"] = &mcp::rpc_handler::personal_importRawKey;
@@ -1188,81 +1189,98 @@ void mcp::rpc_handler::eth_getLogs(mcp::json &j_response, bool &)
 	j_response["result"] = toJson(ret);
 }
 
-//void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
-//{
-//	
-//	std::string hash_text = params[0];
-//	dev::h256 hash;
-//	hash = jsToHash(hash_text);
-//
-//	mcp::db::db_transaction transaction(m_store.create_transaction());
-//	auto _t = m_cache->transaction_get(transaction, hash);
-//	auto td = m_cache->transaction_address_get(transaction, hash);
-//
-//	if (_t == nullptr || td == nullptr)
-//	{
-//		BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Invalid Hash"));
-//	}
-//
-//	dev::eth::McInfo mc_info;
-//	if (!m_chain->get_mc_info_from_block_hash(transaction, m_cache, td->blockHash, mc_info))
-//	{
-//		BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Invalid Mci"));
-//	}
-//	mcp::json options;
-//	options["disableStorage"] = true;
-//	options["disableMemory"] = false;
-//	options["disableStack"] = false;
-//	options["full_storage"] = false;
-//
-//	mcp::json options_json = params[1];
-//	if (options_json.count("disableStorage"))
-//		options["disableStorage"] = options_json["disableStorage"];
-//	if (options_json.count("disableMemory"))
-//		options["disableMemory"] = options_json["disableMemory"];
-//	if (options_json.count("disableStack"))
-//		options["disableStack"] = options_json["disableStack"];
-//	if (options_json.count("full_storage"))
-//		options["full_storage"] = options_json["full_storage"];
-//
-//	try
-//	{
-//		dev::eth::EnvInfo env(transaction, m_store, m_cache, mc_info, mcp::chain_id);
-//		auto block(m_cache->block_get(transaction, td->blockHash));
-//		assert_x(block);
-//		chain_state c_state(transaction, 0, m_store, m_chain, m_cache);
-//		std::vector<h256> accout_state_hashs;
-//		if(!m_store.transaction_previous_account_state_get(transaction, hash, accout_state_hashs))
-//		{
-//			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Invalid Hash"));
-//		}
-//		c_state.ts = *_t;
-//		c_state.set_defalut_account_state(accout_state_hashs);
-//
-//		//c_state should be used after set_defalut_account_state. Otherwise, account_state will be abnormal.
-//		if (!_t->isCreation() && !c_state.addressHasCode(_t->receiveAddress()))
-//		{
-//			j_response["return_value"] = "Only contract transcation can debug.";
-//			return;
-//		}
-//		mcp::ExecutionResult er;
-//		std::list<std::shared_ptr<mcp::trace>> traces;
-//		mcp::Executive e(c_state, env, traces);
-//		e.setResultRecipient(er);
-//
-//		mcp::json trace = m_chain->traceTransaction(e, *_t, options);
-//		j_response["return_value"] = toHexPrefixed(er.output);
-//		j_response["struct_logs"] = trace;
-//	}
-//	catch (Exception const &_e)
-//	{
-//		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Unexpected exception in VM. There may be a bug in this implementation."));
-//	}
-//	catch (std::exception const &_e)
-//	{
-//		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Unknown Error"));
-//	}
-//}
+void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
+{
+	if (!mcp::isH256(params[0]))
+		BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
+
+	try 
+	{
+		// Get the transaction and block information
+		h256 txHash = jsToHash(params[0]);
+		
+		// Get transaction from database
+		mcp::db::db_transaction transaction(m_store.create_transaction());
+		auto _t = m_cache->transaction_get(transaction, txHash);
+		auto td = m_cache->transaction_address_get(transaction, txHash);
+
+		if (_t == nullptr || td == nullptr)
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Transaction not found"));
+		}
+
+		// Get block and environment info
+		dev::eth::McInfo mc_info;
+		if (!m_chain->get_mc_info_from_block_hash(transaction, m_cache, td->blockHash, mc_info))
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Block not found"));
+		}
+
+		// Set up tracer options from params[1] (if provided)
+		mcp::json tracerOptions;
+		if (params.size() > 1 && !params[1].is_null()) {
+			tracerOptions = params[1];
+		}
+		
+		// Set up default debug options
+		mcp::StandardTrace::DebugOptions debugOpts;
+		debugOpts.disable_storage = tracerOptions.value("disableStorage", false);
+		debugOpts.disable_memory = tracerOptions.value("disableMemory", false);
+		debugOpts.disable_stack = tracerOptions.value("disableStack", false);
+		debugOpts.full_storage = tracerOptions.value("full_storage", false);
+
+		// Set up execution environment
+		dev::eth::EnvInfo env(transaction, m_store, m_cache, mc_info, mcp::chain_id);
+		auto block(m_cache->block_get(transaction, td->blockHash));
+		assert_x(block);
+		
+		// Create state for execution
+		chain_state c_state(transaction, 0, m_store, m_chain, m_cache);
+		std::vector<h256> account_state_hashs;
+		if (!m_store.transaction_previous_account_state_get(transaction, txHash, account_state_hashs))
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Cannot retrieve account state"));
+		}
+		c_state.ts = *_t;
+		c_state.set_defalut_account_state(account_state_hashs);
+
+		// Create execution result and tracer
+		mcp::ExecutionResult er;
+		std::list<std::shared_ptr<mcp::trace>> traces;
+		
+		// Create tracer for debugging
+		mcp::StandardTrace tracer;
+		tracer.setShowMnemonics();
+		tracer.setOptions(debugOpts);
+		
+		// Create Executive for transaction execution
+		mcp::Executive executive(c_state, env, traces);
+		executive.setResultRecipient(er);
+		
+		// Execute the transaction with tracing
+		executive.initialize(*_t);
+		if (!executive.execute())
+			executive.go(tracer.onOp());  // This will trigger opcode logging via g_opcodeLogCallback
+		executive.finalize();
+		
+		// Return the structured trace results
+		mcp::json result;
+		result["gas"] = toString(er.gasUsed);
+		result["failed"] = (executive.getException() != mcp::TransactionException::None);
+		result["returnValue"] = toHexPrefixed(er.output);
+		result["structLogs"] = tracer.jsonValue();
+		
+		j_response["result"] = result;
+	}
+	catch (Exception const& _e)
+	{
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Transaction execution failed"));
+	}
+	catch (std::exception const& _e)
+	{
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Unknown error during trace"));
+	}
+}
 //
 //void mcp::rpc_handler::debug_storageRangeAt(mcp::json &j_response, bool &)
 //{
