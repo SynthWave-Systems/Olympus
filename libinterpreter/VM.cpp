@@ -237,99 +237,100 @@ evmc_tx_context const& VM::getTxContext()
 
 std::string VM::getInstructionName(Instruction inst) const
 {
-    // Simple mapping of common opcodes to their names
-    // For debugging purposes, we include the most important ones
-    switch (inst) {
-        case Instruction::STOP: return "STOP";
-        case Instruction::ADD: return "ADD";
-        case Instruction::MUL: return "MUL";
-        case Instruction::SUB: return "SUB";
-        case Instruction::DIV: return "DIV";
-        case Instruction::SDIV: return "SDIV";
-        case Instruction::MOD: return "MOD";
-        case Instruction::SMOD: return "SMOD";
-        case Instruction::ADDMOD: return "ADDMOD";
-        case Instruction::MULMOD: return "MULMOD";
-        case Instruction::EXP: return "EXP";
-        case Instruction::SIGNEXTEND: return "SIGNEXTEND";
-        case Instruction::LT: return "LT";
-        case Instruction::GT: return "GT";
-        case Instruction::SLT: return "SLT";
-        case Instruction::SGT: return "SGT";
-        case Instruction::EQ: return "EQ";
-        case Instruction::ISZERO: return "ISZERO";
-        case Instruction::AND: return "AND";
-        case Instruction::OR: return "OR";
-        case Instruction::XOR: return "XOR";
-        case Instruction::NOT: return "NOT";
-        case Instruction::BYTE: return "BYTE";
-        case Instruction::SHL: return "SHL";
-        case Instruction::SHR: return "SHR";
-        case Instruction::SAR: return "SAR";
-        case Instruction::KECCAK256: return "KECCAK256";
-        case Instruction::ADDRESS: return "ADDRESS";
-        case Instruction::BALANCE: return "BALANCE";
-        case Instruction::ORIGIN: return "ORIGIN";
-        case Instruction::CALLER: return "CALLER";
-        case Instruction::CALLVALUE: return "CALLVALUE";
-        case Instruction::CALLDATALOAD: return "CALLDATALOAD";
-        case Instruction::CALLDATASIZE: return "CALLDATASIZE";
-        case Instruction::CALLDATACOPY: return "CALLDATACOPY";
-        case Instruction::CODESIZE: return "CODESIZE";
-        case Instruction::CODECOPY: return "CODECOPY";
-        case Instruction::GASPRICE: return "GASPRICE";
-        case Instruction::EXTCODESIZE: return "EXTCODESIZE";
-        case Instruction::EXTCODECOPY: return "EXTCODECOPY";
-        case Instruction::RETURNDATASIZE: return "RETURNDATASIZE";
-        case Instruction::RETURNDATACOPY: return "RETURNDATACOPY";
-        case Instruction::EXTCODEHASH: return "EXTCODEHASH";
-        case Instruction::BLOCKHASH: return "BLOCKHASH";
-        case Instruction::COINBASE: return "COINBASE";
-        case Instruction::TIMESTAMP: return "TIMESTAMP";
-        case Instruction::NUMBER: return "NUMBER";
-        case Instruction::DIFFICULTY: return "DIFFICULTY";
-        case Instruction::GASLIMIT: return "GASLIMIT";
-        case Instruction::CHAINID: return "CHAINID";
-        case Instruction::SELFBALANCE: return "SELFBALANCE";
-        case Instruction::BASEFEE: return "BASEFEE";
-        case Instruction::POP: return "POP";
-        case Instruction::MLOAD: return "MLOAD";
-        case Instruction::MSTORE: return "MSTORE";
-        case Instruction::MSTORE8: return "MSTORE8";
-        case Instruction::SLOAD: return "SLOAD";
-        case Instruction::SSTORE: return "SSTORE";
-        case Instruction::JUMP: return "JUMP";
-        case Instruction::JUMPI: return "JUMPI";
-        case Instruction::PC: return "PC";
-        case Instruction::MSIZE: return "MSIZE";
-        case Instruction::GAS: return "GAS";
-        case Instruction::JUMPDEST: return "JUMPDEST";
-        case Instruction::PUSH0: return "PUSH0";
-        case Instruction::LOG0: return "LOG0";
-        case Instruction::LOG1: return "LOG1";
-        case Instruction::LOG2: return "LOG2";
-        case Instruction::LOG3: return "LOG3";
-        case Instruction::LOG4: return "LOG4";
-        case Instruction::CREATE: return "CREATE";
-        case Instruction::CALL: return "CALL";
-        case Instruction::CALLCODE: return "CALLCODE";
-        case Instruction::RETURN: return "RETURN";
-        case Instruction::DELEGATECALL: return "DELEGATECALL";
-        case Instruction::CREATE2: return "CREATE2";
-        case Instruction::STATICCALL: return "STATICCALL";
-        case Instruction::REVERT: return "REVERT";
-        case Instruction::SELFDESTRUCT: return "SELFDESTRUCT";
-        default:
-            // For PUSH1-PUSH32 and DUP1-DUP16, SWAP1-SWAP16
-            int opcode = static_cast<int>(inst);
-            if (opcode >= 0x60 && opcode <= 0x7f) {
-                return "PUSH" + std::to_string(opcode - 0x5f);
-            } else if (opcode >= 0x80 && opcode <= 0x8f) {
-                return "DUP" + std::to_string(opcode - 0x7f);
-            } else if (opcode >= 0x90 && opcode <= 0x9f) {
-                return "SWAP" + std::to_string(opcode - 0x8f);
+    // Use EVMC-compatible opcode mapping for clean, standards-compliant instruction names
+    // Supports up to Shanghai hardfork level as requested
+    uint8_t opcode = static_cast<uint8_t>(inst);
+    
+    // Standard EVM opcodes following EVMC specification
+    switch (opcode) {
+        case 0x00: return "STOP";
+        case 0x01: return "ADD";
+        case 0x02: return "MUL";
+        case 0x03: return "SUB";
+        case 0x04: return "DIV";
+        case 0x05: return "SDIV";
+        case 0x06: return "MOD";
+        case 0x07: return "SMOD";
+        case 0x08: return "ADDMOD";
+        case 0x09: return "MULMOD";
+        case 0x0A: return "EXP";
+        case 0x0B: return "SIGNEXTEND";
+        case 0x10: return "LT";
+        case 0x11: return "GT";
+        case 0x12: return "SLT";
+        case 0x13: return "SGT";
+        case 0x14: return "EQ";
+        case 0x15: return "ISZERO";
+        case 0x16: return "AND";
+        case 0x17: return "OR";
+        case 0x18: return "XOR";
+        case 0x19: return "NOT";
+        case 0x1A: return "BYTE";
+        case 0x1B: return "SHL";
+        case 0x1C: return "SHR";
+        case 0x1D: return "SAR";
+        case 0x20: return "KECCAK256";
+        case 0x30: return "ADDRESS";
+        case 0x31: return "BALANCE";
+        case 0x32: return "ORIGIN";
+        case 0x33: return "CALLER";
+        case 0x34: return "CALLVALUE";
+        case 0x35: return "CALLDATALOAD";
+        case 0x36: return "CALLDATASIZE";
+        case 0x37: return "CALLDATACOPY";
+        case 0x38: return "CODESIZE";
+        case 0x39: return "CODECOPY";
+        case 0x3A: return "GASPRICE";
+        case 0x3B: return "EXTCODESIZE";
+        case 0x3C: return "EXTCODECOPY";
+        case 0x3D: return "RETURNDATASIZE";
+        case 0x3E: return "RETURNDATACOPY";
+        case 0x3F: return "EXTCODEHASH";
+        case 0x40: return "BLOCKHASH";
+        case 0x41: return "COINBASE";
+        case 0x42: return "TIMESTAMP";
+        case 0x43: return "NUMBER";
+        case 0x44: return "DIFFICULTY";
+        case 0x45: return "GASLIMIT";
+        case 0x46: return "CHAINID";
+        case 0x47: return "SELFBALANCE";
+        case 0x48: return "BASEFEE";  // Shanghai hardfork
+        case 0x50: return "POP";
+        case 0x51: return "MLOAD";
+        case 0x52: return "MSTORE";
+        case 0x53: return "MSTORE8";
+        case 0x54: return "SLOAD";
+        case 0x55: return "SSTORE";
+        case 0x56: return "JUMP";
+        case 0x57: return "JUMPI";
+        case 0x58: return "PC";
+        case 0x59: return "MSIZE";
+        case 0x5A: return "GAS";
+        case 0x5B: return "JUMPDEST";
+        case 0x5F: return "PUSH0";  // Shanghai hardfork
+        case 0xF0: return "CREATE";
+        case 0xF1: return "CALL";
+        case 0xF2: return "CALLCODE";
+        case 0xF3: return "RETURN";
+        case 0xF4: return "DELEGATECALL";
+        case 0xF5: return "CREATE2";
+        case 0xFA: return "STATICCALL";
+        case 0xFD: return "REVERT";
+        case 0xFF: return "SELFDESTRUCT";
+        default: {
+            // Handle variable-sized opcodes: PUSH1-PUSH32, DUP1-DUP16, SWAP1-SWAP16, LOG0-LOG4
+            if (opcode >= 0x60 && opcode <= 0x7F) {
+                return "PUSH" + std::to_string(opcode - 0x5F);
+            } else if (opcode >= 0x80 && opcode <= 0x8F) {
+                return "DUP" + std::to_string(opcode - 0x7F);
+            } else if (opcode >= 0x90 && opcode <= 0x9F) {
+                return "SWAP" + std::to_string(opcode - 0x8F);
+            } else if (opcode >= 0xA0 && opcode <= 0xA4) {
+                return "LOG" + std::to_string(opcode - 0xA0);
             }
-            return "OPCODE_" + std::to_string(opcode);
+            // Unknown or invalid opcode
+            return "UNKNOWN_0x" + std::to_string(opcode);
+        }
     }
 }
 
