@@ -74,3 +74,4 @@ Testing
 /secp256k1/src/ecmult_static_context.h
 test_debugging
 test_tracer_collection
+test_corrected_tracer

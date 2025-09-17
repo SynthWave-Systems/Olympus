@@ -336,7 +336,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//mcp::uint256_t start_gas_used = gasUsed();
 			//int64_t start_refunds = m_ext->sub.refunds;
 
-            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer with enhanced block context
+            // Set up opcode logging callback for debugging - enhanced block context for BOOST_LOG only
             g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
                 // Enhanced logging with block-level context (block number, state root) for complete traceability
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
@@ -346,17 +346,9 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                                       << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")"
                                       << " Gas=" << m_gas;
                 
-                // Connect to shared_ptr tracer for structured tracing
-                if (m_tracer && m_ext) {
-                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
-                    // The tracer should handle this gracefully
-                    try {
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
-                    } catch (...) {
-                        // Protect against tracer failures affecting VM execution
-                        BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
-                    }
-                }
+                // NOTE: Do NOT manually call m_tracer->CaptureState() here!
+                // The VM will call the tracer methods properly during execution
+                // Our role here is only for BOOST_LOG enhanced logging
             });
 
             // Create VM instance. Force Interpreter if tracing requested.
