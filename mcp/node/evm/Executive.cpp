@@ -336,12 +336,15 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//mcp::uint256_t start_gas_used = gasUsed();
 			//int64_t start_refunds = m_ext->sub.refunds;
 
-            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
+            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer with enhanced block context
             g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
-                // Log to BOOST_LOG for debugging output
+                // Enhanced logging with block-level context (block number, state root) for complete traceability
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
+                                      << " BlockMci=" << m_envInfo.mci()
+                                      << " Timestamp=" << m_envInfo.timestamp()
                                       << " PC=" << pc << " OP=" << opName 
-                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
+                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")"
+                                      << " Gas=" << m_gas;
                 
                 // Connect to shared_ptr tracer for structured tracing
                 if (m_tracer && m_ext) {

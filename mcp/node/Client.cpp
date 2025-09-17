@@ -2,6 +2,8 @@
 #include <mcp/core/genesis.hpp>
 #include <mcp/node/sync.hpp>
 #include <mcp/core/param.hpp>
+#include <boost/log/trivial.hpp>
+#include <iomanip>
 
 using namespace mcp;
 
@@ -18,6 +20,14 @@ mcp::Client::Client(mcp::block_store& store_a,
 
 std::pair<u256, ExecutionResult> mcp::Client::estimateGas(Address const& _from, u256 _value, Address _dest, bytes const& _data, int64_t _maxGas, u256 _gasPrice, BlockNumber _blockNumber, GasEstimationCallback const& _callback)
 {
+	// Client API-level tracing for gas estimation debugging
+	BOOST_LOG_TRIVIAL(debug) << "Client::estimateGas starting - From=" << _from.hexPrefixed() 
+	                        << " To=" << (_dest ? _dest.hexPrefixed() : "CONTRACT_CREATION")
+	                        << " Value=" << _value 
+	                        << " MaxGas=" << _maxGas 
+	                        << " GasPrice=" << _gasPrice 
+	                        << " BlockNumber=" << _blockNumber;
+
 	try
 	{
 		int64_t upperBound = _maxGas;
@@ -215,6 +225,14 @@ localised_log_entries mcp::Client::logs(LogFilter const& _filter) const
 
 ExecutionResult mcp::Client::call(Address const& _from, u256 _value, Address _dest, bytes const& _data, u256 _gas, u256 _gasPrice, BlockNumber _blockNumber)
 {
+	// Client API-level tracing for complete execution path debugging
+	BOOST_LOG_TRIVIAL(debug) << "Client::call starting - From=" << _from.hexPrefixed() 
+	                        << " To=" << _dest.hexPrefixed() 
+	                        << " Value=" << _value 
+	                        << " Gas=" << _gas 
+	                        << " GasPrice=" << _gasPrice 
+	                        << " BlockNumber=" << _blockNumber;
+
 	dev::eth::McInfo mc_info;
 	if (!getMcInfo(mc_info, _blockNumber))
 		BOOST_THROW_EXCEPTION(BlockNotFound());
@@ -225,8 +243,21 @@ ExecutionResult mcp::Client::call(Address const& _from, u256 _value, Address _de
 	u256 gasPrice = _gasPrice == Invalid256 ? mcp::gas_price: _gasPrice;
 	Transaction _t(_value, gasPrice, gas, _dest, _data, nonce);
 	_t.forceSender(_from);
+	
+	// Enhanced tracing with transaction details
+	BOOST_LOG_TRIVIAL(debug) << "Client::call executing transaction - TxHash=" << _t.sha3().hexPrefixed()
+	                        << " Nonce=" << nonce
+	                        << " ActualGas=" << gas
+	                        << " ActualGasPrice=" << gasPrice;
+	
 	//_t.setSignature(h256(0), h256(0), 0);
 	ExecutionResult const& ret = temp.execute(_t, mc_info, Permanence::Reverted/*, dev::eth::OnOpFunc()*/);
+
+	// Log execution results for debugging
+	BOOST_LOG_TRIVIAL(debug) << "Client::call completed - TxHash=" << _t.sha3().hexPrefixed()
+	                        << " GasUsed=" << ret.gasUsed
+	                        << " OutputSize=" << ret.output.size()
+	                        << " Exception=" << static_cast<int>(ret.excepted);
 
 	return ret;
 }
