@@ -8,16 +8,19 @@
 #include <mcp/node/tracers/Tracer.hpp>
 
 
-mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::function<void(mcp::json const &)> const &response_a) : 
+mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::function<void(mcp::json const &)> const &response_a/*, int m_cap*/) : 
 	body(body_a),
 	rpc(rpc_a),
 	response(response_a),
-	m_chain(rpc_a.m_chain),
-	m_cache(rpc_a.m_cache),
+	//m_chain(rpc_a.m_chain),
+	//m_cache(rpc_a.m_cache),
 	m_key_manager(rpc_a.m_key_manager),
 	m_wallet(rpc_a.m_wallet),
-	m_client(rpc_a.m_client),
-	m_store(rpc.m_store)
+	//m_host(rpc_a.m_host),
+	//m_composer(rpc_a.m_composer),
+	//m_background(rpc_a.m_background),
+	m_client(rpc_a.m_client)/*,
+	m_store(rpc.m_store)*/
 {
 	m_ethRpcMethods["account_remove"] = &mcp::rpc_handler::account_remove;
 	m_ethRpcMethods["account_import"] = &mcp::rpc_handler::account_import;
@@ -1634,71 +1637,76 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	if (!mcp::isH256(params[0]))
 		BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
 
-	std::string hash_text = params[0];
-	dev::h256 hash;
-	hash = jsToHash(hash_text);
-
-	mcp::db::db_transaction transaction(m_store.create_transaction());
-	auto _t = m_cache->transaction_get(transaction, hash);
-	auto td = m_cache->transaction_address_get(transaction, hash);
-
-	if (_t == nullptr || td == nullptr)
+	try 
 	{
-		BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Invalid Hash"));
-	}
+		// Get the transaction and block information
+		h256 txHash = jsToHash(params[0]);
+		
+		// Get transaction from database
+		mcp::db::db_transaction transaction(m_store.create_transaction());
+		auto _t = m_cache->transaction_get(transaction, txHash);
+		auto td = m_cache->transaction_address_get(transaction, txHash);
 
-	dev::eth::McInfo mc_info;
-	if (!m_chain->get_mc_info_from_block_hash(transaction, m_cache, td->blockHash, mc_info))
-	{
-		BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Invalid Mci"));
-	}
-
-	// Set up tracer options from params[1] (if provided)
-	mcp::json tracerOptions;
-	if (params.size() > 1 && !params[1].is_null()) {
-		tracerOptions = params[1];
-	}
-	// Handle legacy options format
-	else {
-		tracerOptions["disableStorage"] = true;
-		tracerOptions["disableMemory"] = false;
-		tracerOptions["disableStack"] = false;
-	}
-
-	try
-	{
-		dev::eth::EnvInfo env(transaction, m_store, m_cache, mc_info, mcp::chain_id);
-		auto block(m_cache->block_get(transaction, td->blockHash));
-		assert_x(block);
-		chain_state c_state(transaction, 0, m_store, m_chain, m_cache);
-		std::vector<h256> accout_state_hashs;
-		if(!m_store.transaction_previous_account_state_get(transaction, hash, accout_state_hashs))
+		if (_t == nullptr || td == nullptr)
 		{
-			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Invalid Hash"));
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Transaction not found"));
 		}
-		c_state.ts = *_t;
-		c_state.set_defalut_account_state(accout_state_hashs);
 
+		// Get block and environment info
+		dev::eth::McInfo mc_info;
+		if (!m_chain->get_mc_info_from_block_hash(transaction, m_cache, td->blockHash, mc_info))
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Block not found"));
+		}
+
+		// Set up tracer options from params[1] (if provided)
+		mcp::json tracerOptions;
+		if (params.size() > 1 && !params[1].is_null()) {
+			tracerOptions = params[1];
+		}
+		
 		// Create execution result and tracer using existing factory
 		mcp::ExecutionResult er;
 		std::shared_ptr<Tracer> tracer = NewTracer(tracerOptions, er);
+		
+		// Set up execution environment
+		dev::eth::EnvInfo env(transaction, m_store, m_cache, mc_info, mcp::chain_id);
+		auto block(m_cache->block_get(transaction, td->blockHash));
+		assert_x(block);
+		
+		// Create state for execution
+		chain_state c_state(transaction, 0, m_store, m_chain, m_cache);
+		std::vector<h256> account_state_hashs;
+		if (!m_store.transaction_previous_account_state_get(transaction, txHash, account_state_hashs))
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Cannot retrieve account state"));
+		}
+		c_state.ts = *_t;
+		c_state.set_defalut_account_state(account_state_hashs);
 
-		// Create Executive with proper tracer integration
+		// Create Executive for transaction execution with tracer
 		mcp::Executive executive(c_state, env, *m_chain->sealEngine(), 0, tracer);
 		executive.setResultRecipient(er);
-
-		// Execute the transaction with tracing enabled
+		
+		// Execute the transaction with tracing
 		executive.initialize(*_t);
-		if (!executive.execute())
-			executive.go();  // This will trigger VM execution with tracer->CaptureState calls
+		if (!executive.execute()) {
+			// The executive.go() will trigger the VM execution with proper tracer integration
+			// The tracer methods will be called by the VM during execution
+			executive.go();
+		}
 		executive.finalize();
-
+		
 		// Return the structured trace results from the tracer
 		j_response["result"] = tracer->GetResult();
 	}
-	catch (...)
+	catch (Exception const& _e)
 	{
-		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Transaction trace failed"));
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Transaction execution failed"));
+	}
+	catch (std::exception const& _e)
+	{
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Unknown error during trace"));
 	}
 }
 
