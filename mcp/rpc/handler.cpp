@@ -6,6 +6,7 @@
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
 #include <mcp/node/debug.hpp>
+#include <mcp/node/tracers/Tracer.hpp>
 
 mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::function<void(mcp::json const &)> const &response_a, int m_cap) : body(body_a),
 																																				 rpc(rpc_a),
@@ -1218,16 +1219,21 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 
 		// Set up tracer options from params[1] (if provided)
 		mcp::json tracerOptions;
+		std::string tracerType = "opcodeTracer";  // Default tracer type
+		
 		if (params.size() > 1 && !params[1].is_null()) {
 			tracerOptions = params[1];
+			// Check if a specific tracer is requested
+			if (tracerOptions.contains("tracer") && tracerOptions["tracer"].is_string()) {
+				tracerType = tracerOptions["tracer"].get<std::string>();
+			}
 		}
 		
-		// Set up default debug options
-		mcp::StandardTrace::DebugOptions debugOpts;
-		debugOpts.disable_storage = tracerOptions.value("disableStorage", false);
-		debugOpts.disable_memory = tracerOptions.value("disableMemory", false);
-		debugOpts.disable_stack = tracerOptions.value("disableStack", false);
-		debugOpts.full_storage = tracerOptions.value("full_storage", false);
+		// Create the appropriate tracer based on the request
+		auto tracer = CreateTracer(tracerType, tracerOptions);
+		if (!tracer) {
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Unknown tracer type: " + tracerType));
+		}
 
 		// Set up execution environment
 		dev::eth::EnvInfo env(transaction, m_store, m_cache, mc_info, mcp::chain_id);
@@ -1244,33 +1250,35 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 		c_state.ts = *_t;
 		c_state.set_defalut_account_state(account_state_hashs);
 
-		// Create execution result and tracer
+		// Create execution result and traces
 		mcp::ExecutionResult er;
 		std::list<std::shared_ptr<mcp::trace>> traces;
-		
-		// Create tracer for debugging
-		mcp::StandardTrace tracer;
-		tracer.setShowMnemonics();
-		tracer.setOptions(debugOpts);
 		
 		// Create Executive for transaction execution
 		mcp::Executive executive(c_state, env, traces);
 		executive.setResultRecipient(er);
 		
-		// Execute the transaction with tracing
+		// Set up tracer callback to connect with our new tracer system
+		auto tracerCallback = [&tracer](uint64_t PC, dev::eth::Instruction inst, uint64_t gas, uint64_t cost,
+		                               dev::eth::VMFace const* vm, dev::eth::ExtVMFace const* extVM) {
+			tracer->CaptureState(PC, inst, gas, cost, vm, extVM);
+		};
+		
+		// Execute the transaction with the new tracer
 		executive.initialize(*_t);
-		if (!executive.execute())
-			executive.go(tracer.onOp());  // This will trigger opcode logging via g_opcodeLogCallback
+		if (!executive.execute()) {
+			// Create a bridge function that calls our tracer
+			auto onOp = [tracerCallback](uint64_t steps, uint64_t PC, dev::eth::Instruction inst, 
+			                            bigint newMemSize, bigint gasCost, bigint gas,
+			                            dev::eth::VMFace const* vm, dev::eth::ExtVMFace const* extVM) {
+				tracerCallback(PC, inst, static_cast<uint64_t>(gas), static_cast<uint64_t>(gasCost), vm, extVM);
+			};
+			executive.go(onOp);
+		}
 		executive.finalize();
 		
-		// Return the structured trace results
-		mcp::json result;
-		result["gas"] = toString(er.gasUsed);
-		result["failed"] = (executive.getException() != mcp::TransactionException::None);
-		result["returnValue"] = toHexPrefixed(er.output);
-		result["structLogs"] = tracer.jsonValue();
-		
-		j_response["result"] = result;
+		// Return the results from our tracer
+		j_response["result"] = tracer->GetResult();
 	}
 	catch (Exception const& _e)
 	{
