@@ -84,67 +84,79 @@ namespace
         }
 
         template <class Func>
-        void dispatchToAll(std::vector<TracerMultiplexer::NamedTracer>& tracers, Func&& fn)
+        void forEach(std::vector<TracerHookSet::NamedTracer>& tracers, Func&& fn)
         {
                 for (auto& entry : tracers)
-                        fn(entry.second.get());
+                        fn(entry.first, entry.second.get());
         }
 }
 
-void TracerMultiplexer::CaptureTxStart(uint64_t _gasLimit)
+void TracerHookSet::addTracer(std::string name, std::shared_ptr<Tracer> tracer)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureTxStart(_gasLimit); });
+        if (!tracer)
+                return;
+
+        if (name.empty())
+                name = "tracer" + std::to_string(m_tracers.size());
+
+        m_tracers.emplace_back(std::move(name), std::move(tracer));
 }
 
-void TracerMultiplexer::CaptureTxEnd(uint64_t _restGas)
+void TracerHookSet::CaptureTxStart(uint64_t _gasLimit)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureTxEnd(_restGas); });
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureTxStart(_gasLimit); });
 }
 
-void TracerMultiplexer::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev::Address const& _from, dev::Address const& _to,
+void TracerHookSet::CaptureTxEnd(uint64_t _restGas)
+{
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureTxEnd(_restGas); });
+}
+
+void TracerHookSet::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev::Address const& _from, dev::Address const& _to,
         bool _create, dev::bytes const& _input, uint64_t _gas, dev::u256 _value)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value); });
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value); });
 }
 
-void TracerMultiplexer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
+void TracerHookSet::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureEnd(_output, _gasUsed, _excepted); });
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureEnd(_output, _gasUsed, _excepted); });
 }
 
-void TracerMultiplexer::CaptureEnter(dev::eth::Instruction _inst, dev::Address const& _from, dev::Address const& _to,
+void TracerHookSet::CaptureEnter(dev::eth::Instruction _inst, dev::Address const& _from, dev::Address const& _to,
         dev::bytes const& _input, uint64_t _gas, std::shared_ptr<dev::u256> _value)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureEnter(_inst, _from, _to, _input, _gas, _value); });
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureEnter(_inst, _from, _to, _input, _gas, _value); });
 }
 
-void TracerMultiplexer::CaptureExit(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
+void TracerHookSet::CaptureExit(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureExit(_output, _gasUsed, _excepted); });
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureExit(_output, _gasUsed, _excepted); });
 }
 
-void TracerMultiplexer::CaptureState(uint64_t PC, dev::eth::Instruction inst,
+void TracerHookSet::CaptureState(uint64_t PC, dev::eth::Instruction inst,
         uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureState(PC, inst, gasCost, gas, _vm, voidExt); });
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureState(PC, inst, gasCost, gas, _vm, voidExt); });
 }
 
-void TracerMultiplexer::CaptureFault(uint64_t _PC, dev::eth::Instruction _inst,
+void TracerHookSet::CaptureFault(uint64_t _PC, dev::eth::Instruction _inst,
         uint64_t _gasCost, uint64_t _gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* _voidExt)
 {
-        dispatchToAll(m_tracers, [&](Tracer* tracer) { tracer->CaptureFault(_PC, _inst, _gasCost, _gas, _vm, _voidExt); });
+        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureFault(_PC, _inst, _gasCost, _gas, _vm, _voidExt); });
 }
 
-mcp::json TracerMultiplexer::GetResult()
+mcp::json TracerHookSet::GetResult()
 {
         if (m_tracers.empty())
                 return mcp::json::object();
 
+        if (m_tracers.size() == 1)
+                return m_tracers.front().second->GetResult();
+
         mcp::json result = mcp::json::object();
         for (auto const& entry : m_tracers)
-        {
                 result[entry.first] = entry.second->GetResult();
-        }
         return result;
 }
 
@@ -155,8 +167,7 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
                 auto const& tracerArray = _param["tracers"];
                 if (tracerArray.is_array() && !tracerArray.empty())
                 {
-                        std::vector<TracerMultiplexer::NamedTracer> tracers;
-                        tracers.reserve(tracerArray.size());
+                        auto hookSet = std::make_shared<TracerHookSet>();
 
                         for (auto const& definition : tracerArray)
                         {
@@ -200,11 +211,11 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
                                 if (resultKey.empty())
                                         resultKey = tracerName;
 
-                                tracers.emplace_back(resultKey, tracer);
+                                hookSet->addTracer(resultKey, tracer);
                         }
 
-                        if (!tracers.empty())
-                                return std::make_shared<TracerMultiplexer>(std::move(tracers));
+                        if (!hookSet->empty())
+                                return hookSet;
                 }
         }
 

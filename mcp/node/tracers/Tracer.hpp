@@ -35,13 +35,12 @@ namespace mcp
 
         };
 
-        class TracerMultiplexer : public Tracer
+        class TracerHookSet : public Tracer
         {
         public:
                 using NamedTracer = std::pair<std::string, std::shared_ptr<Tracer>>;
 
-                explicit TracerMultiplexer(std::vector<NamedTracer> tracers) : m_tracers(std::move(tracers)) {}
-
+                void addTracer(std::string name, std::shared_ptr<Tracer> tracer);
                 bool empty() const { return m_tracers.empty(); }
 
                 void CaptureTxStart(uint64_t _gasLimit) override;
