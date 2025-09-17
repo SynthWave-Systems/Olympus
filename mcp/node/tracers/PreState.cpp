@@ -8,10 +8,13 @@ using namespace dev::eth;
 void mcp::PreStateTracer::CaptureTxStart(uint64_t _gasLimit)
 {
     gasLimit = _gasLimit;
+    Tracer::CaptureTxStart(_gasLimit);
 }
 
 void mcp::PreStateTracer::CaptureTxEnd(uint64_t _restGas)
 {
+    Tracer::CaptureTxEnd(_restGas);
+
     if (!m_options.DiffMode)
         return;
 
@@ -103,10 +106,14 @@ void mcp::PreStateTracer::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev:
 
     if (_create && m_options.DiffMode)
         created[_to] = true;
+
+    Tracer::CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value);
 }
 
 void mcp::PreStateTracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
 {
+    Tracer::CaptureEnd(_output, _gasUsed, _excepted);
+
     if (m_options.DiffMode)
         return;
 
@@ -118,6 +125,8 @@ void mcp::PreStateTracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUse
 
 void mcp::PreStateTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
+    Tracer::CaptureState(PC, inst, gasCost, gas, _vm, voidExt);
+
     auto vm = dynamic_cast<LegacyVM const*>(_vm);
     u256s stackData = vm->stack();
     auto stackLen = stackData.size();

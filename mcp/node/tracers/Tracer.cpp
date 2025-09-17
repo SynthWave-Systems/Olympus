@@ -83,15 +83,9 @@ namespace
                 return std::make_shared<OpCode>(er, config);
         }
 
-        template <class Func>
-        void forEach(std::vector<TracerHookSet::NamedTracer>& tracers, Func&& fn)
-        {
-                for (auto& entry : tracers)
-                        fn(entry.first, entry.second.get());
-        }
 }
 
-void TracerHookSet::addTracer(std::string name, std::shared_ptr<Tracer> tracer)
+void Tracer::addTracer(std::string name, std::shared_ptr<Tracer> tracer)
 {
         if (!tracer)
                 return;
@@ -102,51 +96,64 @@ void TracerHookSet::addTracer(std::string name, std::shared_ptr<Tracer> tracer)
         m_tracers.emplace_back(std::move(name), std::move(tracer));
 }
 
-void TracerHookSet::CaptureTxStart(uint64_t _gasLimit)
+namespace
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureTxStart(_gasLimit); });
+        template <class Func>
+        void dispatch(std::vector<Tracer::NamedTracer> const& tracers, Func&& fn)
+        {
+                for (auto const& entry : tracers)
+                {
+                        if (entry.second)
+                                fn(*entry.second);
+                }
+        }
 }
 
-void TracerHookSet::CaptureTxEnd(uint64_t _restGas)
+void Tracer::CaptureTxStart(uint64_t _gasLimit)
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureTxEnd(_restGas); });
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureTxStart(_gasLimit); });
 }
 
-void TracerHookSet::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev::Address const& _from, dev::Address const& _to,
+void Tracer::CaptureTxEnd(uint64_t _restGas)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureTxEnd(_restGas); });
+}
+
+void Tracer::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev::Address const& _from, dev::Address const& _to,
         bool _create, dev::bytes const& _input, uint64_t _gas, dev::u256 _value)
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value); });
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value); });
 }
 
-void TracerHookSet::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
+void Tracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureEnd(_output, _gasUsed, _excepted); });
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureEnd(_output, _gasUsed, _excepted); });
 }
 
-void TracerHookSet::CaptureEnter(dev::eth::Instruction _inst, dev::Address const& _from, dev::Address const& _to,
+void Tracer::CaptureEnter(dev::eth::Instruction _inst, dev::Address const& _from, dev::Address const& _to,
         dev::bytes const& _input, uint64_t _gas, std::shared_ptr<dev::u256> _value)
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureEnter(_inst, _from, _to, _input, _gas, _value); });
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureEnter(_inst, _from, _to, _input, _gas, _value); });
 }
 
-void TracerHookSet::CaptureExit(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
+void Tracer::CaptureExit(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureExit(_output, _gasUsed, _excepted); });
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureExit(_output, _gasUsed, _excepted); });
 }
 
-void TracerHookSet::CaptureState(uint64_t PC, dev::eth::Instruction inst,
+void Tracer::CaptureState(uint64_t PC, dev::eth::Instruction inst,
         uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureState(PC, inst, gasCost, gas, _vm, voidExt); });
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureState(PC, inst, gasCost, gas, _vm, voidExt); });
 }
 
-void TracerHookSet::CaptureFault(uint64_t _PC, dev::eth::Instruction _inst,
+void Tracer::CaptureFault(uint64_t _PC, dev::eth::Instruction _inst,
         uint64_t _gasCost, uint64_t _gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* _voidExt)
 {
-        forEach(m_tracers, [&](std::string const&, Tracer* tracer) { tracer->CaptureFault(_PC, _inst, _gasCost, _gas, _vm, _voidExt); });
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureFault(_PC, _inst, _gasCost, _gas, _vm, _voidExt); });
 }
 
-mcp::json TracerHookSet::GetResult()
+mcp::json Tracer::GetResult()
 {
         if (m_tracers.empty())
                 return mcp::json::object();
@@ -167,7 +174,7 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
                 auto const& tracerArray = _param["tracers"];
                 if (tracerArray.is_array() && !tracerArray.empty())
                 {
-                        auto hookSet = std::make_shared<TracerHookSet>();
+                        auto rootTracer = std::make_shared<Tracer>();
 
                         for (auto const& definition : tracerArray)
                         {
@@ -211,11 +218,11 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
                                 if (resultKey.empty())
                                         resultKey = tracerName;
 
-                                hookSet->addTracer(resultKey, tracer);
+                                rootTracer->addTracer(resultKey, tracer);
                         }
 
-                        if (!hookSet->empty())
-                                return hookSet;
+                        if (rootTracer->hasChildren())
+                                return rootTracer;
                 }
         }
 
@@ -229,7 +236,8 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
 
                 mergeConfig(config, extractInlineConfig(_param));
 
-                return createTracerByName(_param["tracer"], _er, config);
+                if (_param["tracer"].is_string())
+                        return createTracerByName(_param["tracer"].get<std::string>(), _er, config);
         }
 
         return std::make_shared<OpCode>(_er, _param);
