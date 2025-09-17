@@ -100,17 +100,17 @@ namespace mcp
 		void handleMsg(mcp::jsonrpcMessage const& req);
 		mcp::json handleCallMsg(mcp::jsonrpcMessage const& req, bool& async);
 		std::shared_ptr<mcp::Client> client() { return m_client; }
-		void traceTransaction(mcp::Executive& _e, mcp::Transaction const& _t);
 
-		//std::shared_ptr<mcp::chain> m_chain;
-		//std::shared_ptr<mcp::block_cache> m_cache;
+
+		std::shared_ptr<mcp::chain> m_chain;
+		std::shared_ptr<mcp::block_cache> m_cache;
 		std::shared_ptr<mcp::key_manager> m_key_manager;
 		std::shared_ptr<mcp::wallet> m_wallet;
 		//std::shared_ptr<mcp::p2p::host> m_host;
 		//std::shared_ptr<mcp::composer> m_composer;
 		//std::shared_ptr<mcp::async_task> m_background;
 		std::shared_ptr<mcp::Client> m_client;
-		//mcp::block_store m_store;
+		mcp::block_store m_store;
 
 		std::map<std::string, RPCMethodPointer> m_ethRpcMethods;
 
