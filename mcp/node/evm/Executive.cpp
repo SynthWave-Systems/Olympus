@@ -3,13 +3,13 @@
 
 #include <libevm/LegacyVM.h>
 #include <libevm/VMFactory.h>
-#include <libinterpreter/VM.h>
 #include <mcp/common/Exceptions.h>
 #include <mcp/common/stopwatch.hpp>
 #include <mcp/core/param.hpp>
 #include <mcp/node/chain.hpp>
 #include <numeric>
 #include <iomanip>
+#include <limits>
 
 using namespace std;
 using namespace dev;
@@ -122,6 +122,7 @@ bool mcp::Executive::call(Address const& _receiveAddress, Address const& _sender
 	//	m_tracer->CaptureStart(_senderAddress, _receiveAddress, false, _data.toBytes(), uint64_t(m_gas), _value);
 
     dev::eth::CallParameters params(_senderAddress, _receiveAddress, _receiveAddress, _value, _value, _gas, _data, nullptr/*, {}*/);
+    params.tracer = m_tracer;
     return call(params, _gasPrice, _senderAddress);
 }
 
@@ -160,14 +161,14 @@ bool mcp::Executive::call(dev::eth::CallParameters const& _p, u256 const& _gasPr
 	else
 	{
 		m_gas = _p.gas;
-		if (m_s.addressHasCode(_p.codeAddress))
-		{
-			bytes const& c = m_s.code(_p.codeAddress);
-			h256 codeHash = m_s.codeHash(_p.codeAddress);
-			m_ext = std::make_shared<ExtVM>(m_s, m_envInfo, m_sealEngine, _p.receiveAddress,
-				_p.senderAddress, _origin, _p.apparentValue, _gasPrice, _p.data, &c, codeHash,
-				0, m_depth, false, _p.staticCall);
-		}
+                if (m_s.addressHasCode(_p.codeAddress))
+                {
+                        bytes const& c = m_s.code(_p.codeAddress);
+                        h256 codeHash = m_s.codeHash(_p.codeAddress);
+                        m_ext = std::make_shared<ExtVM>(m_s, m_envInfo, m_sealEngine, _p.receiveAddress,
+                                _p.senderAddress, _origin, _p.apparentValue, _gasPrice, _p.data, &c, codeHash,
+                                0, m_depth, false, _p.staticCall, m_tracer);
+                }
 	}
 
 	////call trace action
@@ -296,8 +297,8 @@ bool mcp::Executive::executeCreate(Address const& _sender, u256 const& _endowmen
     // Schedule _init execution if not empty.
 	if (!_init.empty())
 	{
-		m_ext = std::make_shared<ExtVM>(m_s, m_envInfo, m_sealEngine, m_newAddress, _sender, _origin, _endowment, _gasPrice,
-			dev::bytesConstRef(), _init, sha3(_init), 0, m_depth, true, false);
+                m_ext = std::make_shared<ExtVM>(m_s, m_envInfo, m_sealEngine, m_newAddress, _sender, _origin, _endowment, _gasPrice,
+                        dev::bytesConstRef(), _init, sha3(_init), 0, m_depth, true, false, m_tracer);
 	}
 
 	if (m_tracer && m_ext && topCall())
@@ -336,31 +337,35 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//mcp::uint256_t start_gas_used = gasUsed();
 			//int64_t start_refunds = m_ext->sub.refunds;
 
-            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
-                // Log to BOOST_LOG for debugging output
-                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
-                                      << " PC=" << pc << " OP=" << opName 
-                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
-                
-                // Connect to shared_ptr tracer for structured tracing
-                if (m_tracer && m_ext) {
-                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
-                    // The tracer should handle this gracefully
-                    try {
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
-                    } catch (...) {
-                        // Protect against tracer failures affecting VM execution
-                        BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
+            OnOpFunc tracerOnOp;
+            if (m_tracer)
+            {
+                tracerOnOp = [this](uint64_t /*steps*/, uint64_t pc, Instruction op, bigint /*newMemSize*/, bigint gasCost,
+                                     bigint gas, VMFace const* vm, ExtVMFace const* ext) {
+                    auto toUint64 = [](bigint const& value) -> uint64_t {
+                        if (value <= 0)
+                            return 0;
+                        if (value > std::numeric_limits<uint64_t>::max())
+                            return std::numeric_limits<uint64_t>::max();
+                        return static_cast<uint64_t>(value);
+                    };
+
+                    try
+                    {
+                        m_tracer->CaptureState(pc, op, toUint64(gasCost), toUint64(gas), vm, ext);
                     }
-                }
-            });
+                    catch (...)
+                    {
+                        BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " opcode=" << static_cast<int>(op);
+                    }
+                };
+            }
 
             // Create VM instance. Force Interpreter if tracing requested.
             auto vm = VMFactory::create();
             if (m_isCreation)
             {
-				m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
+                                m_output = vm->exec(m_gas, *m_ext, m_tracer, tracerOnOp);
                 if (m_res)
                 {
                     m_res->gasForDeposit = m_gas;
@@ -402,7 +407,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
             }
             else
             //{
-                m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
+                m_output = vm->exec(m_gas, *m_ext, m_tracer, tracerOnOp);
 
 				////call trace result 
 				//std::shared_ptr<mcp::call_trace_result> call_result(std::make_shared<mcp::call_trace_result>());
@@ -472,8 +477,6 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
         cnote << "VM took:" << t.elapsed() << "; gas used: " << (sgas - m_endGas);
 #endif
         
-        // Clear the opcode logging callback
-        g_opcodeLogCallback = nullptr;
     }
     return true;
 }

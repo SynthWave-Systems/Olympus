@@ -1681,6 +1681,6 @@ void mcp::rpc_handler::traceTransaction(mcp::Executive& _e, mcp::Transaction con
 	// Initialize, execute, and finalize the transaction with tracing enabled
 	_e.initialize(_t);
 	if (!_e.execute())
-		_e.go();  // This will trigger opcode logging via g_opcodeLogCallback and tracer->CaptureState
+		_e.go();  // This will trigger tracer CaptureState callbacks via the VM on-op hook
 	_e.finalize();
 }
