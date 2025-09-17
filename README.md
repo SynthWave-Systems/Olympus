@@ -3,6 +3,20 @@ Official C++ implementation of the Olympus protocol.
 
 To understand the consensus algorithm in Olympus, refer to the mcp [yellow paper](https://resources.computecoin.com/docs/computecoin-consensus-and-security.pdf).
 
+## Features
+
+### Enhanced EVM Debugging 🔍
+Olympus includes comprehensive EVM debugging and tracing capabilities:
+
+- **Complete execution path tracing** from Client API calls to individual VM opcodes
+- **Block-level context logging** with MCI (Main Chain Index), timestamps, and state information  
+- **Transaction hash traceability** across all execution layers
+- **`debug_traceTransaction` RPC API** for external debugging tools
+- **Structured logging** with BOOST_LOG integration
+- **Performance-optimized** callback system for production use
+
+See [`docs/EVM_Debugging_Guide.md`](docs/EVM_Debugging_Guide.md) for complete documentation.
+
 [![API Reference](
 https://img.shields.io/badge/c++-reference-blue.svg
 )](https://docs.oortech.com/oort/community/developers/blockchain-developers/)

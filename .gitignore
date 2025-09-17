@@ -72,3 +72,4 @@ Testing
 /build_debug
 
 /secp256k1/src/ecmult_static_context.h
+test_debugging
