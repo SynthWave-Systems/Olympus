@@ -1645,11 +1645,24 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 		LocalisedTransaction t = client()->localisedTransaction(txHash);
 		Block block = client()->blockByHash(t.blockHash(), true);
 		
-		// Set up tracer options from params[1] (if provided)
-		mcp::json tracerOptions;
-		if (params.size() > 1 && !params[1].is_null()) {
-			tracerOptions = params[1];
-		}
+                // Set up tracer options from params[1] (if provided)
+                mcp::json tracerOptions = mcp::json::object();
+                if (params.size() > 1 && !params[1].is_null())
+                {
+                        auto const& rawOptions = params[1];
+                        if (rawOptions.is_string())
+                        {
+                                tracerOptions["tracer"] = rawOptions.get<std::string>();
+                        }
+                        else if (rawOptions.is_array())
+                        {
+                                tracerOptions["tracers"] = rawOptions;
+                        }
+                        else
+                        {
+                                tracerOptions = rawOptions;
+                        }
+                }
 		
 		// Create execution result and tracer
 		mcp::ExecutionResult er;
