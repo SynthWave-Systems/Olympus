@@ -5,8 +5,7 @@
 #include <mcp/core/param.hpp>
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
-//#include <mcp/node/debug.hpp>
-//#include <mcp/node/tracers/OpCode.hpp>
+#include <mcp/node/tracers/Tracer.hpp>
 
 
 mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::function<void(mcp::json const &)> const &response_a/*, int m_cap*/) : 
@@ -1642,45 +1641,73 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	{
 		// Get the transaction and block information
 		h256 txHash = jsToHash(params[0]);
-		LocalisedTransaction t = client()->localisedTransaction(txHash);
-		Block block = client()->blockByHash(t.blockHash(), true);
 		
+		// Get transaction from database
+		mcp::db::db_transaction transaction(m_store.create_transaction());
+		auto _t = m_cache->transaction_get(transaction, txHash);
+		auto td = m_cache->transaction_address_get(transaction, txHash);
+
+		if (_t == nullptr || td == nullptr)
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Transaction not found"));
+		}
+
+		// Get block and environment info
+		dev::eth::McInfo mc_info;
+		if (!m_chain->get_mc_info_from_block_hash(transaction, m_cache, td->blockHash, mc_info))
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Block not found"));
+		}
+
 		// Set up tracer options from params[1] (if provided)
 		mcp::json tracerOptions;
 		if (params.size() > 1 && !params[1].is_null()) {
 			tracerOptions = params[1];
 		}
 		
-		// Create execution result and tracer
+		// Create execution result and tracer using existing factory
 		mcp::ExecutionResult er;
 		std::shared_ptr<Tracer> tracer = NewTracer(tracerOptions, er);
 		
-		// Create state and executive - the Executive constructor will set up proper intermediate state
-		chain_state s(chain_state::Null);
-		Executive executive(s, block, t.transactionIndex(), client()->blockChain(), tracer);
+		// Set up execution environment
+		dev::eth::EnvInfo env(transaction, m_store, m_cache, mc_info, mcp::chain_id);
+		auto block(m_cache->block_get(transaction, td->blockHash));
+		assert_x(block);
+		
+		// Create state for execution
+		chain_state c_state(transaction, 0, m_store, m_chain, m_cache);
+		std::vector<h256> account_state_hashs;
+		if (!m_store.transaction_previous_account_state_get(transaction, txHash, account_state_hashs))
+		{
+			BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Cannot retrieve account state"));
+		}
+		c_state.ts = *_t;
+		c_state.set_defalut_account_state(account_state_hashs);
+
+		// Create Executive for transaction execution with tracer
+		mcp::Executive executive(c_state, env, *m_chain->sealEngine(), 0, tracer);
 		executive.setResultRecipient(er);
 		
 		// Execute the transaction with tracing
-		traceTransaction(executive, t);
+		executive.initialize(*_t);
+		if (!executive.execute()) {
+			// The executive.go() will trigger the VM execution with proper tracer integration
+			// The tracer methods will be called by the VM during execution
+			executive.go();
+		}
+		executive.finalize();
 		
-		// Return the structured trace results
+		// Return the structured trace results from the tracer
 		j_response["result"] = tracer->GetResult();
 	}
-	catch (TransactionNotFound const&)
+	catch (Exception const& _e)
 	{
-		BOOST_THROW_EXCEPTION(RPC_Error_NoResult());
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Transaction execution failed"));
 	}
-	catch (BlockNotFound const&)
+	catch (std::exception const& _e)
 	{
-		BOOST_THROW_EXCEPTION(RPC_Error_NoResult());
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError("Unknown error during trace"));
 	}
 }
 
-void mcp::rpc_handler::traceTransaction(mcp::Executive& _e, mcp::Transaction const& _t)
-{
-	// Initialize, execute, and finalize the transaction with tracing enabled
-	_e.initialize(_t);
-	if (!_e.execute())
-		_e.go();  // This will trigger opcode logging via g_opcodeLogCallback and tracer->CaptureState
-	_e.finalize();
-}
+
