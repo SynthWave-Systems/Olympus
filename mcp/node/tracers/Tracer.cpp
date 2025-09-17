@@ -12,6 +12,11 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
     {
         if (_param["tracer"] == "noopTracer")
             return std::make_shared<Tracer>();
+        else if (_param["tracer"] == "opcodeTracer")
+        {
+            // Explicit OpCode tracer selection with configuration support
+            return std::make_shared<OpCodeTracer>(_er, _param);
+        }
         else if (_param["tracer"] == "4byteTracer")
             return std::make_shared<FourByteTracer>();
         else if (_param["tracer"] == "callTracer")
@@ -31,5 +36,6 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
             
     }
 
-    return std::make_shared<OpCode>(_er, _param);
+    // Default to OpCode tracer when no specific tracer is selected
+    return std::make_shared<OpCodeTracer>(_er, _param);
 }

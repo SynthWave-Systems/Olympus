@@ -75,3 +75,4 @@ Testing
 test_debugging
 test_tracer_collection
 test_corrected_tracer
+test_complete_tracer

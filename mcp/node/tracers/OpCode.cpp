@@ -3,7 +3,7 @@
 #include <mcp/node/evm/ExtVM.h>
 
 using namespace dev::eth;
-void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
+void mcp::OpCodeTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
 	// check if already accumulated the specified number of logs
@@ -100,7 +100,7 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	m_outValue.push_back(r);
 }
 
-mcp::json mcp::OpCode::GetResult()
+mcp::json mcp::OpCodeTracer::GetResult()
 {
 	mcp::json ret;
 	ret["gas"] = m_res->gasUsed.convert_to<uint64_t>()/*toJS(t.gas())*/;
@@ -110,9 +110,9 @@ mcp::json mcp::OpCode::GetResult()
 	return ret;
 }
 
-mcp::OpCode::DebugOptions mcp::OpCode::debugOptions(mcp::json const& _json)
+mcp::OpCodeTracer::DebugOptions mcp::OpCodeTracer::debugOptions(mcp::json const& _json)
 {
-	mcp::OpCode::DebugOptions op;
+	mcp::OpCodeTracer::DebugOptions op;
 	if (!_json.is_object() || _json.empty())
 		return op;
 	if (_json.count("enableMemory") && !_json["enableMemory"].empty())

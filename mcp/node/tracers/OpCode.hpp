@@ -3,7 +3,7 @@
 
 namespace mcp
 {
-	class OpCode: public Tracer
+	class OpCodeTracer: public Tracer
 	{
 	public:
 		struct DebugOptions
@@ -17,7 +17,7 @@ namespace mcp
 			int limit = 0;// maximum length of output, but zero means unlimited
 		};
 
-		explicit OpCode(mcp::ExecutionResult& _er, mcp::json const& _param = mcp::json()) noexcept :
+		explicit OpCodeTracer(mcp::ExecutionResult& _er, mcp::json const& _param = mcp::json()) noexcept :
 			//Tracer(_er),
 			m_res{ &_er },
 			m_options(debugOptions(_param)) {}
@@ -28,7 +28,7 @@ namespace mcp
 		mcp::json GetResult() override;
 
 	private:
-		OpCode::DebugOptions debugOptions(mcp::json const& _json);
+		OpCodeTracer::DebugOptions debugOptions(mcp::json const& _json);
 		DebugOptions m_options;
 		mcp::json m_outValue{ mcp::json::array() };
 		ExecutionResult* m_res = nullptr;
