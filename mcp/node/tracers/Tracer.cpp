@@ -12,6 +12,40 @@ using namespace mcp;
 
 namespace
 {
+        bool isReservedConfigKey(std::string const& key)
+        {
+                return key == "tracer" || key == "type" || key == "name" || key == "config" || key == "tracerConfig" || key == "timeout" || key == "reexec";
+        }
+
+        mcp::json extractInlineConfig(mcp::json const& definition)
+        {
+                if (!definition.is_object())
+                        return mcp::json::object();
+
+                mcp::json config = mcp::json::object();
+                for (auto it = definition.begin(); it != definition.end(); ++it)
+                {
+                        if (isReservedConfigKey(it.key()))
+                                continue;
+
+                        config[it.key()] = it.value();
+                }
+
+                return config;
+        }
+
+        void mergeConfig(mcp::json& baseConfig, mcp::json const& inlineConfig)
+        {
+                if (!inlineConfig.is_object() || inlineConfig.empty())
+                        return;
+
+                if (!baseConfig.is_object())
+                        baseConfig = mcp::json::object();
+
+                for (auto it = inlineConfig.begin(); it != inlineConfig.end(); ++it)
+                        baseConfig[it.key()] = it.value();
+        }
+
         std::string toLowerCopy(std::string value)
         {
                 std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
@@ -147,6 +181,9 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
                                         else if (definition.count("tracerConfig"))
                                                 config = definition["tracerConfig"];
 
+                                        auto inlineConfig = extractInlineConfig(definition);
+                                        mergeConfig(config, inlineConfig);
+
                                         if (definition.count("name") && definition["name"].is_string())
                                                 resultKey = definition["name"].get<std::string>();
                                         else if (!tracerName.empty())
@@ -174,8 +211,12 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
         if (_param.count("tracer") && !_param["tracer"].empty())
         {
                 mcp::json config;
-                if (_param.count("tracerConfig"))
+                if (_param.count("config"))
+                        config = _param["config"];
+                else if (_param.count("tracerConfig"))
                         config = _param["tracerConfig"];
+
+                mergeConfig(config, extractInlineConfig(_param));
 
                 return createTracerByName(_param["tracer"], _er, config);
         }

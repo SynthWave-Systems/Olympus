@@ -12,7 +12,6 @@ namespace mcp
 {
         class Tracer : public dev::eth::EVMLogger
         {
-                friend class OpCode;
         public:
                 explicit Tracer() {};
 
