@@ -1,5 +1,5 @@
 #include "OpcodeTracer.hpp"
-#include <mcp/common/jsonHelper.hpp>
+#include <mcp/rpc/jsonHelper.hpp>
 #include <mcp/node/evm/ExtVM.h>
 #include <libevm/LegacyVM.h>
 
@@ -24,7 +24,7 @@ void OpcodeTracer::CaptureState(uint64_t PC, Instruction inst, uint64_t gas, uin
         auto legacyVM = dynamic_cast<LegacyVM const*>(vm);
         if (legacyVM) {
             for (auto const& item : legacyVM->stack()) {
-                step.stack.push_back(toCompactHex(item, 32));
+                step.stack.push_back(dev::toCompactHex(item, 32));
             }
         }
     }
@@ -36,7 +36,7 @@ void OpcodeTracer::CaptureState(uint64_t PC, Instruction inst, uint64_t gas, uin
             auto const& memory = legacyVM->memory();
             for (size_t i = 0; i < memory.size(); i += 32) {
                 bytesConstRef chunk(memory.data() + i, std::min(size_t(32), memory.size() - i));
-                step.memory.push_back(toHex(chunk));
+                step.memory.push_back(dev::toHex(chunk));
             }
         }
     }
@@ -47,8 +47,8 @@ void OpcodeTracer::CaptureState(uint64_t PC, Instruction inst, uint64_t gas, uin
         if (extVMImpl) {
             step.storage = mcp::json::object();
             for (auto const& item : extVMImpl->state().storage(extVMImpl->myAddress)) {
-                step.storage[toCompactHexPrefixed(item.second.first, 1)] = 
-                    toCompactHex(item.second.second, 32);
+                step.storage[dev::toCompactHexPrefixed(item.second.first, 1)] = 
+                    dev::toCompactHex(item.second.second, 32);
             }
         }
     }

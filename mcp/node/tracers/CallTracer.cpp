@@ -1,5 +1,5 @@
 #include "CallTracer.hpp"
-#include <mcp/common/jsonHelper.hpp>
+#include <mcp/rpc/jsonHelper.hpp>
 
 using namespace dev;
 using namespace dev::eth;
@@ -21,9 +21,9 @@ void CallTracer::CaptureStart(int depth, Address const& from, Address const& to,
     CallFrame frame;
     frame.from = from.hexPrefixed();
     frame.to = to.hexPrefixed();
-    frame.value = toHexPrefixed(value);
-    frame.gas = toHexPrefixed(gas);
-    frame.input = toHex(input);
+    frame.value = dev::toJS(value);  // Use toJS for u256 conversion
+    frame.gas = dev::toJS(gas);      // Use toJS for uint64_t conversion
+    frame.input = dev::toJS(input);  // Use toJS for bytes conversion
     frame.type = "CALL";  // Default, will be refined based on context
     
     if (!m_hasRootCall) {
@@ -48,8 +48,8 @@ void CallTracer::CaptureEnd(bytes const& output, uint64_t gasUsed, std::string c
         CallFrame frame = m_callStack.top();
         m_callStack.pop();
         
-        frame.output = toHex(output);
-        frame.gasUsed = toHexPrefixed(gasUsed);
+        frame.output = dev::toJS(output);
+        frame.gasUsed = dev::toJS(gasUsed);
         frame.error = error;
         frame.reverted = !error.empty();
         
@@ -63,8 +63,8 @@ void CallTracer::CaptureEnd(bytes const& output, uint64_t gasUsed, std::string c
     }
     
     if (currentFrame) {
-        currentFrame->output = toHex(output);
-        currentFrame->gasUsed = toHexPrefixed(gasUsed);
+        currentFrame->output = dev::toJS(output);
+        currentFrame->gasUsed = dev::toJS(gasUsed);
         currentFrame->error = error;
         currentFrame->reverted = !error.empty();
     }
