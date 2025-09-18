@@ -14,7 +14,6 @@
 using namespace std;
 using namespace dev;
 using namespace dev::eth;
-using namespace dev::eth;
 
 // Global reference to current libinterpreter VM for tracer access
 const dev::eth::VM* g_currentInterpreterVM = nullptr;
@@ -340,7 +339,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//int64_t start_refunds = m_ext->sub.refunds;
 
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* interpreterVm) {
+            g_opcodeLogCallback = dev::eth::OpcodeLogCallback([this](uint64_t pc, dev::eth::Instruction op, const std::string& opName, const dev::eth::VM* interpreterVm) {
                 // Log to BOOST_LOG for debugging output
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
                                       << " PC=" << pc << " OP=" << opName 
