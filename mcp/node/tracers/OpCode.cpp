@@ -1,17 +1,34 @@
 #include "OpCode.hpp"
-#include <libevm/LegacyVM.h>
+#include <libinterpreter/VM.h>
 #include <mcp/node/evm/ExtVM.h>
+#include <array>
+#include <cstdint>
+
+namespace
+{
+dev::u256 intxToU256(intx::uint256 const& value)
+{
+    auto bytes = intx::be::store<std::array<uint8_t, 32>>(value);
+    dev::u256 result = 0;
+    for (uint8_t byte : bytes)
+    {
+        result <<= 8;
+        result |= dev::u256(byte);
+    }
+    return result;
+}
+}
 
 using namespace dev::eth;
 void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
-	uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
+        uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
 	// check if already accumulated the specified number of logs
 	if (m_options.limit != 0 && m_options.limit <= m_outValue.size())
 		return;
 
-	ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
-	auto vm = dynamic_cast<LegacyVM const*>(_vm);
+        ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
+        auto vm = dynamic_cast<dev::eth::VM const*>(_vm);
 
 	mcp::json r = mcp::json::object();
 
@@ -27,18 +44,18 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	//	r["memexpand"] = toString(newMemSize);
 
 	mcp::json stack = mcp::json::array();
-	if (vm && !m_options.disableStack)
-	{
-		//mcp::log m_log = { mcp::log("vm") };
-		// Try extracting information about the stack from the VM is supported.
-		for (auto const& i : vm->stack())
-		{
-			//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
-			stack.push_back(toCompactHexPrefixedTrim(i));
-		}
+        if (vm && !m_options.disableStack)
+        {
+                //mcp::log m_log = { mcp::log("vm") };
+                // Try extracting information about the stack from the VM is supported.
+                for (auto const& i : vm->stack())
+                {
+                        //LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
+                        stack.push_back(toCompactHexPrefixedTrim(intxToU256(i)));
+                }
 
-		r["stack"] = stack;
-	}
+                r["stack"] = stack;
+        }
 
 	//bool newContext = false;
 	//Instruction lastInst = Instruction::STOP;
@@ -69,9 +86,9 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	//	m_lastInst.resize(ext.depth + 1);
 	//}
 
-	if (vm)
-	{
-		bytes const& memory = vm->memory();
+        if (vm)
+        {
+                bytes const& memory = vm->memory();
 
 		mcp::json memJson(mcp::json::array());
 		if (m_options.enableMemory)

@@ -124,6 +124,15 @@ namespace eth
 
 // Global opcode logging callback
 OpcodeLogCallback g_opcodeLogCallback;
+
+std::vector<intx::uint256> VM::stack() const
+{
+    std::vector<intx::uint256> out;
+    out.reserve(static_cast<size_t>(m_stackEnd - m_SP));
+    for (auto it = m_SP; it != m_stackEnd; ++it)
+        out.emplace_back(*it);
+    return out;
+}
 uint64_t VM::memNeed(intx::uint256 const& _offset, intx::uint256 const& _size)
 {
     return toInt63(_size ? intx::uint512(_offset) + _size : intx::uint512(0));
