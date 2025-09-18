@@ -4,32 +4,241 @@
 #include "Call.hpp"
 #include "PreState.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <string>
+
 using namespace mcp;
+
+namespace
+{
+        bool isReservedConfigKey(std::string const& key)
+        {
+                return key == "tracer" || key == "type" || key == "name" || key == "config" || key == "tracerConfig" || key == "timeout" || key == "reexec";
+        }
+
+        mcp::json extractInlineConfig(mcp::json const& definition)
+        {
+                if (!definition.is_object())
+                        return mcp::json::object();
+
+                mcp::json config = mcp::json::object();
+                for (auto it = definition.begin(); it != definition.end(); ++it)
+                {
+                        if (isReservedConfigKey(it.key()))
+                                continue;
+
+                        config[it.key()] = it.value();
+                }
+
+                return config;
+        }
+
+        void mergeConfig(mcp::json& baseConfig, mcp::json const& inlineConfig)
+        {
+                if (!inlineConfig.is_object() || inlineConfig.empty())
+                        return;
+
+                if (!baseConfig.is_object())
+                        baseConfig = mcp::json::object();
+
+                for (auto it = inlineConfig.begin(); it != inlineConfig.end(); ++it)
+                        baseConfig[it.key()] = it.value();
+        }
+
+        std::string toLowerCopy(std::string value)
+        {
+                std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                return value;
+        }
+
+        std::shared_ptr<Tracer> createTracerByName(std::string const& tracerName, mcp::ExecutionResult& er, mcp::json const& config)
+        {
+                auto normalized = toLowerCopy(tracerName);
+
+                if (normalized == "noop" || normalized == "nooptracer")
+                        return std::make_shared<Tracer>();
+
+                if (normalized == "4byte" || normalized == "4bytetracer")
+                        return std::make_shared<FourByteTracer>();
+
+                if (normalized == "call" || normalized == "calltracer")
+                {
+                        if (config.is_null() || config.empty())
+                                return std::make_shared<CallTracer>(er);
+                        return std::make_shared<CallTracer>(er, config);
+                }
+
+                if (normalized == "prestate" || normalized == "prestatetracer")
+                {
+                        if (config.is_null() || config.empty())
+                                return std::make_shared<PreStateTracer>(er);
+                        return std::make_shared<PreStateTracer>(er, config);
+                }
+
+                if (normalized == "opcode" || normalized == "opcodetracer" || normalized == "optracer" || normalized == "structlogger" || normalized == "structlogs")
+                        return std::make_shared<OpCode>(er, config);
+
+                // Default tracer falls back to opcode tracing while preserving any configuration
+                return std::make_shared<OpCode>(er, config);
+        }
+
+}
+
+void Tracer::addTracer(std::string name, std::shared_ptr<Tracer> tracer)
+{
+        if (!tracer)
+                return;
+
+        if (name.empty())
+                name = "tracer" + std::to_string(m_tracers.size());
+
+        m_tracers.emplace_back(std::move(name), std::move(tracer));
+}
+
+namespace
+{
+        template <class Func>
+        void dispatch(std::vector<Tracer::NamedTracer> const& tracers, Func&& fn)
+        {
+                for (auto const& entry : tracers)
+                {
+                        if (entry.second)
+                                fn(*entry.second);
+                }
+        }
+}
+
+void Tracer::CaptureTxStart(uint64_t _gasLimit)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureTxStart(_gasLimit); });
+}
+
+void Tracer::CaptureTxEnd(uint64_t _restGas)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureTxEnd(_restGas); });
+}
+
+void Tracer::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev::Address const& _from, dev::Address const& _to,
+        bool _create, dev::bytes const& _input, uint64_t _gas, dev::u256 _value)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value); });
+}
+
+void Tracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureEnd(_output, _gasUsed, _excepted); });
+}
+
+void Tracer::CaptureEnter(dev::eth::Instruction _inst, dev::Address const& _from, dev::Address const& _to,
+        dev::bytes const& _input, uint64_t _gas, std::shared_ptr<dev::u256> _value)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureEnter(_inst, _from, _to, _input, _gas, _value); });
+}
+
+void Tracer::CaptureExit(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureExit(_output, _gasUsed, _excepted); });
+}
+
+void Tracer::CaptureState(uint64_t PC, dev::eth::Instruction inst,
+        uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureState(PC, inst, gasCost, gas, _vm, voidExt); });
+}
+
+void Tracer::CaptureFault(uint64_t _PC, dev::eth::Instruction _inst,
+        uint64_t _gasCost, uint64_t _gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* _voidExt)
+{
+        dispatch(m_tracers, [&](Tracer& tracer) { tracer.CaptureFault(_PC, _inst, _gasCost, _gas, _vm, _voidExt); });
+}
+
+mcp::json Tracer::GetResult()
+{
+        if (m_tracers.empty())
+                return mcp::json::object();
+
+        if (m_tracers.size() == 1)
+                return m_tracers.front().second->GetResult();
+
+        mcp::json result = mcp::json::object();
+        for (auto const& entry : m_tracers)
+                result[entry.first] = entry.second->GetResult();
+        return result;
+}
 
 std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionResult& _er)
 {
-    if (_param.count("tracer") && !_param["tracer"].empty())
-    {
-        if (_param["tracer"] == "noopTracer")
-            return std::make_shared<Tracer>();
-        else if (_param["tracer"] == "4byteTracer")
-            return std::make_shared<FourByteTracer>();
-        else if (_param["tracer"] == "callTracer")
+        if (_param.is_object() && _param.count("tracers"))
         {
-            if (_param.count("tracerConfig"))
-                return std::make_shared<CallTracer>(_er, _param["tracerConfig"]);
-            else
-                return std::make_shared<CallTracer>(_er);
-        }
-        else if (_param["tracer"] == "prestateTracer")
-        {
-            if (_param.count("tracerConfig"))
-                return std::make_shared<PreStateTracer>(_er, _param["tracerConfig"]);
-            else
-                return std::make_shared<PreStateTracer>(_er);
-        }
-            
-    }
+                auto const& tracerArray = _param["tracers"];
+                if (tracerArray.is_array() && !tracerArray.empty())
+                {
+                        auto rootTracer = std::make_shared<Tracer>();
 
-    return std::make_shared<OpCode>(_er, _param);
+                        for (auto const& definition : tracerArray)
+                        {
+                                std::string tracerName;
+                                std::string resultKey;
+                                mcp::json config;
+
+                                if (definition.is_string())
+                                {
+                                        tracerName = definition.get<std::string>();
+                                        resultKey = tracerName;
+                                }
+                                else if (definition.is_object())
+                                {
+                                        if (definition.count("tracer") && definition["tracer"].is_string())
+                                                tracerName = definition["tracer"].get<std::string>();
+                                        else if (definition.count("type") && definition["type"].is_string())
+                                                tracerName = definition["type"].get<std::string>();
+
+                                        if (definition.count("config"))
+                                                config = definition["config"];
+                                        else if (definition.count("tracerConfig"))
+                                                config = definition["tracerConfig"];
+
+                                        auto inlineConfig = extractInlineConfig(definition);
+                                        mergeConfig(config, inlineConfig);
+
+                                        if (definition.count("name") && definition["name"].is_string())
+                                                resultKey = definition["name"].get<std::string>();
+                                        else if (!tracerName.empty())
+                                                resultKey = tracerName;
+                                }
+
+                                if (tracerName.empty())
+                                        continue;
+
+                                auto tracer = createTracerByName(tracerName, _er, config);
+                                if (!tracer)
+                                        continue;
+
+                                if (resultKey.empty())
+                                        resultKey = tracerName;
+
+                                rootTracer->addTracer(resultKey, tracer);
+                        }
+
+                        if (rootTracer->hasChildren())
+                                return rootTracer;
+                }
+        }
+
+        if (_param.count("tracer") && !_param["tracer"].empty())
+        {
+                mcp::json config;
+                if (_param.count("config"))
+                        config = _param["config"];
+                else if (_param.count("tracerConfig"))
+                        config = _param["tracerConfig"];
+
+                mergeConfig(config, extractInlineConfig(_param));
+
+                if (_param["tracer"].is_string())
+                        return createTracerByName(_param["tracer"].get<std::string>(), _er, config);
+        }
+
+        return std::make_shared<OpCode>(_er, _param);
 }

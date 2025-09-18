@@ -4,13 +4,15 @@
 
 using namespace dev::eth;
 void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
-	uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
+        uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
-	// check if already accumulated the specified number of logs
-	if (m_options.limit != 0 && m_options.limit <= m_outValue.size())
-		return;
+        Tracer::CaptureState(PC, inst, gasCost, gas, _vm, voidExt);
 
-	ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
+        // check if already accumulated the specified number of logs
+        if (m_options.limit != 0 && m_options.limit <= m_outValue.size())
+                return;
+
+        ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
 	auto vm = dynamic_cast<LegacyVM const*>(_vm);
 
 	mcp::json r = mcp::json::object();

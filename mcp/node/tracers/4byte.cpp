@@ -7,10 +7,14 @@ void mcp::FourByteTracer::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev:
 {
     if (_input.size() >= 4)
         store(dev::bytes(_input.begin(), _input.begin()+4), _input.size()-4);
+
+    Tracer::CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value);
 }
 
 void mcp::FourByteTracer::CaptureEnter(dev::eth::Instruction _inst, dev::Address const& _from, dev::Address const& _to, dev::bytes const& _input, uint64_t _gas, std::shared_ptr<dev::u256> _value)
 {
+    Tracer::CaptureEnter(_inst, _from, _to, _input, _gas, _value);
+
     if (_input.size() < 4)
         return;
 

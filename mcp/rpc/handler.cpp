@@ -1645,11 +1645,24 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 		LocalisedTransaction t = client()->localisedTransaction(txHash);
 		Block block = client()->blockByHash(t.blockHash(), true);
 		
-		// Set up tracer options from params[1] (if provided)
-		mcp::json tracerOptions;
-		if (params.size() > 1 && !params[1].is_null()) {
-			tracerOptions = params[1];
-		}
+                // Set up tracer options from params[1] (if provided)
+                mcp::json tracerOptions = mcp::json::object();
+                if (params.size() > 1 && !params[1].is_null())
+                {
+                        auto const& rawOptions = params[1];
+                        if (rawOptions.is_string())
+                        {
+                                tracerOptions["tracer"] = rawOptions.get<std::string>();
+                        }
+                        else if (rawOptions.is_array())
+                        {
+                                tracerOptions["tracers"] = rawOptions;
+                        }
+                        else
+                        {
+                                tracerOptions = rawOptions;
+                        }
+                }
 		
 		// Create execution result and tracer
 		mcp::ExecutionResult er;
@@ -1681,6 +1694,6 @@ void mcp::rpc_handler::traceTransaction(mcp::Executive& _e, mcp::Transaction con
 	// Initialize, execute, and finalize the transaction with tracing enabled
 	_e.initialize(_t);
 	if (!_e.execute())
-		_e.go();  // This will trigger opcode logging via g_opcodeLogCallback and tracer->CaptureState
+		_e.go();  // This will trigger tracer CaptureState callbacks via the VM on-op hook
 	_e.finalize();
 }

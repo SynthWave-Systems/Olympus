@@ -33,6 +33,7 @@ void mcp::CallTracer::callFrame::processOutput(dev::bytes const& _output, Transa
 void mcp::CallTracer::CaptureTxStart(uint64_t _gasLimit)
 {
     gasLimit = _gasLimit;
+    Tracer::CaptureTxStart(_gasLimit);
 }
 
 void mcp::CallTracer::CaptureTxEnd(uint64_t _restGas)
@@ -44,6 +45,8 @@ void mcp::CallTracer::CaptureTxEnd(uint64_t _restGas)
         // Logs are not emitted when the call fails
         clearFailedLogs(callstack[0], false);
     }
+
+    Tracer::CaptureTxEnd(_restGas);
 }
 
 void mcp::CallTracer::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev::Address const& _from, dev::Address const& _to, bool _create, dev::bytes const& _input, uint64_t _gas, dev::u256 _value)
@@ -54,15 +57,20 @@ void mcp::CallTracer::CaptureStart(dev::eth::ExtVMFace const* _voidExt, dev::Add
     callstack[0].Input = _input;
     callstack[0].Gas = gasLimit;
     callstack[0].Value = std::make_shared<dev::u256>(_value);
+
+    Tracer::CaptureStart(_voidExt, _from, _to, _create, _input, _gas, _value);
 }
 
 void mcp::CallTracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
 {
     callstack[0].processOutput(_output, _excepted);
+    Tracer::CaptureEnd(_output, _gasUsed, _excepted);
 }
 
 void mcp::CallTracer::CaptureEnter(dev::eth::Instruction _inst, dev::Address const& _from, dev::Address const& _to, dev::bytes const& _input, uint64_t _gas, std::shared_ptr<dev::u256> _value)
 {
+    Tracer::CaptureEnter(_inst, _from, _to, _input, _gas, _value);
+
     if (m_options.OnlyTopCall)
         return;
 
@@ -71,6 +79,8 @@ void mcp::CallTracer::CaptureEnter(dev::eth::Instruction _inst, dev::Address con
 
 void mcp::CallTracer::CaptureExit(dev::bytes const& _output, uint64_t _gasUsed, mcp::TransactionException const _excepted)
 {
+    Tracer::CaptureExit(_output, _gasUsed, _excepted);
+
     if (m_options.OnlyTopCall)
         return;
 
@@ -90,6 +100,8 @@ void mcp::CallTracer::CaptureExit(dev::bytes const& _output, uint64_t _gasUsed, 
 
 void mcp::CallTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
+    Tracer::CaptureState(PC, inst, gasCost, gas, _vm, voidExt);
+
     // Only logs need to be captured via opcode processing
     if (!m_options.WithLog)
         return;
