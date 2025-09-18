@@ -22,7 +22,7 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	r["depth"] = ext.depth + 1;  // depth in standard trace is 1-based
 
 	// Try to get stack/memory from libinterpreter VM via global reference
-	extern const dev::eth::VM* g_currentVM;
+	extern dev::eth::VM* g_currentVM;
 	
 	// Handle stack capture - use libinterpreter VM directly
 	mcp::json stack = mcp::json::array();

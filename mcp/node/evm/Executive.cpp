@@ -15,8 +15,8 @@ using namespace std;
 using namespace dev;
 using namespace dev::eth;
 
-// Global reference to current libinterpreter VM for tracer access
-const dev::eth::VM* g_currentVM = nullptr;
+// Global reference to current libinterpreter VM for tracer access  
+dev::eth::VM* g_currentVM = nullptr;
 
 namespace
 {
@@ -353,7 +353,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                         uint64_t currentGas = static_cast<uint64_t>(m_gas);
                         
                         // Set global reference to current interpreter VM for tracers to access
-                        g_currentVM = interpreterVm;
+                        g_currentVM = const_cast<dev::eth::VM*>(interpreterVm);
                         
                         // Call tracer - pass nullptr for VMFace since we're using libinterpreter VM
                         // Tracers can access g_currentVM for stack/memory data
