@@ -5,8 +5,7 @@
 #include <mcp/core/param.hpp>
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
-//#include <mcp/node/debug.hpp>
-//#include <mcp/node/tracers/OpCode.hpp>
+#include <mcp/node/tracers/Tracer.hpp>
 
 
 mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::function<void(mcp::json const &)> const &response_a/*, int m_cap*/) : 
@@ -1655,8 +1654,8 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 		mcp::ExecutionResult er;
 		std::shared_ptr<Tracer> tracer = NewTracer(tracerOptions, er);
 		
-		// Create state and executive - the Executive constructor will set up proper intermediate state
-		chain_state s(chain_state::Null);
+		// Create state from the block's state - this ensures we have the correct state context
+		chain_state s = block.state();
 		Executive executive(s, block, t.transactionIndex(), client()->blockChain(), tracer);
 		executive.setResultRecipient(er);
 		
@@ -1674,13 +1673,16 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	{
 		BOOST_THROW_EXCEPTION(RPC_Error_NoResult());
 	}
+	catch (std::exception const& e)
+	{
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError(std::string("Transaction tracing failed: ") + e.what()));
+	}
 }
 
 void mcp::rpc_handler::traceTransaction(mcp::Executive& _e, mcp::Transaction const& _t)
 {
-	// Initialize, execute, and finalize the transaction with tracing enabled
+	// Initialize and execute the transaction with tracing enabled
 	_e.initialize(_t);
-	if (!_e.execute())
-		_e.go();  // This will trigger opcode logging via g_opcodeLogCallback and tracer->CaptureState
+	_e.execute();  // This will call create() or call() which internally call go() for actual execution
 	_e.finalize();
 }
