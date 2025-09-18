@@ -6,6 +6,7 @@
 #include "VMConfig.h"
 
 #include <libevm/VMFace.h>
+#include <libevm/Instruction.h>
 #include <intx/intx.hpp>
 
 #include <evmc/evmc.h>
@@ -66,6 +67,12 @@ public:
 
     // Set opcode logging callback for debugging
     void setOpcodeLogCallback(const OpcodeLogCallback& callback) { m_opcodeLogCallback = callback; }
+
+    // Tracer support methods - provide access to VM state for tracing
+    bytes const& getMemory() const { return m_mem; }
+    size_t getStackSize() const { return m_stackEnd - m_SP; }
+    intx::uint256 const* getStackPointer() const { return m_SP; }
+    intx::uint256 const* getStackEnd() const { return m_stackEnd; }
 
     uint64_t m_io_gas = 0;
 private:

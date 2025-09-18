@@ -1,6 +1,7 @@
 #include "OpCode.hpp"
-#include <libevm/LegacyVM.h>
 #include <mcp/node/evm/ExtVM.h>
+#include <libinterpreter/VM.h>
+#include <intx/intx.hpp>
 
 using namespace dev::eth;
 void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
@@ -11,84 +12,53 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 		return;
 
 	ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
-	auto vm = dynamic_cast<LegacyVM const*>(_vm);
-
+	
 	mcp::json r = mcp::json::object();
 
 	r["pc"] = PC;
 	r["op"] = instructionInfo(inst).name;
-	//r["op"] = static_cast<uint8_t>(inst);
-	//if (m_showMnemonics)
-	//	r["opName"] = instructionInfo(inst).name;
-	r["gas"] = gas/*.convert_to<uint64_t>()*//*toString(gas)*/;
-	r["gasCost"] = gasCost/*.convert_to<uint64_t>()*//*toString(gasCost)*/;
+	r["gas"] = gas;
+	r["gasCost"] = gasCost;
 	r["depth"] = ext.depth + 1;  // depth in standard trace is 1-based
-	//if (!!newMemSize)
-	//	r["memexpand"] = toString(newMemSize);
 
+	// Try to get stack/memory from libinterpreter VM via global reference
+	extern dev::eth::VM* g_currentVM;
+	
+	// Handle stack capture - use libinterpreter VM directly
 	mcp::json stack = mcp::json::array();
-	if (vm && !m_options.disableStack)
+	if (!m_options.disableStack && g_currentVM)
 	{
-		//mcp::log m_log = { mcp::log("vm") };
-		// Try extracting information about the stack from the VM is supported.
-		for (auto const& i : vm->stack())
-		{
-			//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
-			stack.push_back(toCompactHexPrefixedTrim(i));
+		// Access stack from libinterpreter VM
+		auto stackPtr = g_currentVM->getStackPointer();
+		auto stackEnd = g_currentVM->getStackEnd();
+		size_t stackSize = g_currentVM->getStackSize();  // Using const method
+		
+		// Stack grows from high address to low address
+		for (size_t i = 0; i < stackSize; ++i) {
+			auto& stackItem = stackPtr[i];
+			// Convert intx::uint256 to hex string using intx::hex
+			std::string hexValue = "0x" + intx::hex(stackItem);
+			stack.push_back(hexValue);
 		}
-
-		r["stack"] = stack;
 	}
+	r["stack"] = stack;
 
-	//bool newContext = false;
-	//Instruction lastInst = Instruction::STOP;
-
-	////assert_x(ext.depth > 0);
-	//if (m_lastInst.size() == ext.depth /*- 1*/)
-	//{
-	//	// starting a new context
-	//	assert(m_lastInst.size() == ext.depth/* - 1*/);
-	//	m_lastInst.push_back(inst);
-	//	newContext = true;
-	//}
-	//else if (m_lastInst.size() == ext.depth + 2)
-	//{
-	//	m_lastInst.pop_back();
-	//	lastInst = m_lastInst.back();
-	//}
-	//else if (m_lastInst.size() == ext.depth + 1)
-	//{
-	//	// continuing in previous context
-	//	lastInst = m_lastInst.back();
-	//	m_lastInst.back() = inst;
-	//}
-	//else
-	//{
-	//	cwarn << "GAA!!! Tracing VM and more than one new/deleted stack frame between steps!";
-	//	cwarn << "Attmepting naive recovery...";
-	//	m_lastInst.resize(ext.depth + 1);
-	//}
-
-	if (vm)
+	// Handle memory capture - use libinterpreter VM directly
+	mcp::json memJson(mcp::json::array());
+	if (m_options.enableMemory && g_currentVM)
 	{
-		bytes const& memory = vm->memory();
-
-		mcp::json memJson(mcp::json::array());
-		if (m_options.enableMemory)
+		bytes const& memory = g_currentVM->getMemory();
+		for (unsigned i = 0; i < memory.size(); i += 32)
 		{
-			for (unsigned i = 0; i < memory.size(); i += 32)
-			{
-				bytesConstRef memRef(memory.data() + i, 32);
-				memJson.push_back(toHex(memRef));
-			}
-			r["memory"] = memJson;
+			bytesConstRef memRef(memory.data() + i, 32);
+			memJson.push_back(toHex(memRef));
 		}
-		//r["memSize"] = static_cast<uint64_t>(memory.size());
 	}
+	r["memory"] = memJson;
 
+	// Storage capture - this works with ExtVM regardless of VM type
 	if (!m_options.disableStorage &&
-		(inst == Instruction::SLOAD || inst == Instruction::SSTORE)
-		/*(m_options.fullStorage || changesStorage(lastInst) || newContext)*/)
+		(inst == Instruction::SLOAD || inst == Instruction::SSTORE))
 	{
 		mcp::json storage(mcp::json::object());
 		for (auto const& i : ext.state().storage(ext.myAddress))
