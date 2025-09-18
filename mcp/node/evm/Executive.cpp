@@ -340,7 +340,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
             // Create a lambda that matches the exact OpcodeLogCallback signature
-            auto callback = [this](uint64_t pc, Instruction op, const std::string& opName, const VM* interpreterVm) {
+            auto callback = [this](uint64_t pc, dev::eth::Instruction op, const std::string& opName, const dev::eth::VM* interpreterVm) {
                 // Log to BOOST_LOG for debugging output
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
                                       << " PC=" << pc << " OP=" << opName 
