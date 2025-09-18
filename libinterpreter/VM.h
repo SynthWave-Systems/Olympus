@@ -6,6 +6,7 @@
 #include "VMConfig.h"
 
 #include <libevm/VMFace.h>
+#include <libevm/Instruction.h>
 #include <intx/intx.hpp>
 
 #include <evmc/evmc.h>
