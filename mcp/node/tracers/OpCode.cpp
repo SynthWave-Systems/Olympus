@@ -1,5 +1,4 @@
 #include "OpCode.hpp"
-#include <libevm/LegacyVM.h>
 #include <mcp/node/evm/ExtVM.h>
 #include <libinterpreter/VM.h>
 #include <intx/intx.hpp>
@@ -25,62 +24,34 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	// Try to get stack/memory from libinterpreter VM via global reference
 	extern const dev::eth::VM* g_currentInterpreterVM;
 	
-	// Handle stack capture 
+	// Handle stack capture - use libinterpreter VM directly
 	mcp::json stack = mcp::json::array();
-	if (!m_options.disableStack)
+	if (!m_options.disableStack && g_currentInterpreterVM)
 	{
-		// First try LegacyVM if VMFace is available
-		if (_vm) {
-			auto legacyVm = dynamic_cast<LegacyVM const*>(_vm);
-			if (legacyVm) {
-				for (auto const& i : legacyVm->stack())
-				{
-					stack.push_back(toCompactHexPrefixedTrim(i));
-				}
-			}
-		}
-		// Use libinterpreter VM via global reference if available
-		else if (g_currentInterpreterVM) {
-			// Access stack from libinterpreter VM
-			auto stackPtr = g_currentInterpreterVM->getStackPointer();
-			auto stackEnd = g_currentInterpreterVM->getStackEnd();
-			size_t stackSize = g_currentInterpreterVM->getStackSize();
-			
-			// Stack grows from high address to low address
-			for (size_t i = 0; i < stackSize; ++i) {
-				auto& stackItem = stackPtr[i];
-				// Convert intx::uint256 to dev::u256 and then to hex
-				dev::u256 value = static_cast<dev::u256>(stackItem);
-				stack.push_back(toCompactHexPrefixedTrim(value));
-			}
+		// Access stack from libinterpreter VM
+		auto stackPtr = g_currentInterpreterVM->getStackPointer();
+		auto stackEnd = g_currentInterpreterVM->getStackEnd();
+		size_t stackSize = g_currentInterpreterVM->getStackSize();
+		
+		// Stack grows from high address to low address
+		for (size_t i = 0; i < stackSize; ++i) {
+			auto& stackItem = stackPtr[i];
+			// Convert intx::uint256 to dev::u256 and then to hex
+			dev::u256 value = static_cast<dev::u256>(stackItem);
+			stack.push_back(toCompactHexPrefixedTrim(value));
 		}
 	}
 	r["stack"] = stack;
 
-	// Handle memory capture 
+	// Handle memory capture - use libinterpreter VM directly
 	mcp::json memJson(mcp::json::array());
-	if (m_options.enableMemory)
+	if (m_options.enableMemory && g_currentInterpreterVM)
 	{
-		// First try LegacyVM if VMFace is available
-		if (_vm) {
-			auto legacyVm = dynamic_cast<LegacyVM const*>(_vm);
-			if (legacyVm) {
-				bytes const& memory = legacyVm->memory();
-				for (unsigned i = 0; i < memory.size(); i += 32)
-				{
-					bytesConstRef memRef(memory.data() + i, 32);
-					memJson.push_back(toHex(memRef));
-				}
-			}
-		}
-		// Use libinterpreter VM via global reference if available  
-		else if (g_currentInterpreterVM) {
-			bytes const& memory = g_currentInterpreterVM->getMemory();
-			for (unsigned i = 0; i < memory.size(); i += 32)
-			{
-				bytesConstRef memRef(memory.data() + i, 32);
-				memJson.push_back(toHex(memRef));
-			}
+		bytes const& memory = g_currentInterpreterVM->getMemory();
+		for (unsigned i = 0; i < memory.size(); i += 32)
+		{
+			bytesConstRef memRef(memory.data() + i, 32);
+			memJson.push_back(toHex(memRef));
 		}
 	}
 	r["memory"] = memJson;
