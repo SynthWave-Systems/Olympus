@@ -16,6 +16,9 @@ using namespace dev;
 using namespace dev::eth;
 using namespace dev::eth;
 
+// Global reference to current libinterpreter VM for tracer access
+const dev::eth::VM* g_currentInterpreterVM = nullptr;
+
 namespace
 {
 	std::string dumpStackAndMemory(LegacyVM const& _vm)
@@ -337,7 +340,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//int64_t start_refunds = m_ext->sub.refunds;
 
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = OpcodeLogCallback([this, vm](uint64_t pc, Instruction op, const std::string& opName, const VM* interpreterVm) {
+            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* interpreterVm) {
                 // Log to BOOST_LOG for debugging output
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
                                       << " PC=" << pc << " OP=" << opName 
@@ -346,14 +349,18 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                 // Connect to shared_ptr tracer for structured tracing
                 if (m_tracer && m_ext) {
                     try {
-                        // When using LegacyVM, pass the vm.get() as VMFace
-                        // When using Interpreter, pass nullptr since interpreterVm is libinterpreter::VM
-                        const dev::eth::VMFace* vmFace = vm.get();
-                        uint64_t gasCost = 0; // TODO: Get actual gas cost if available
+                        uint64_t gasCost = 0; // TODO: Get actual gas cost if available from interpreterVm
                         uint64_t currentGas = static_cast<uint64_t>(m_gas);
                         
-                        // Call tracer with proper VM and ExtVM context
-                        m_tracer->CaptureState(pc, op, gasCost, currentGas, vmFace, m_ext.get());
+                        // Set global reference to current interpreter VM for tracers to access
+                        g_currentInterpreterVM = interpreterVm;
+                        
+                        // Call tracer - pass nullptr for VMFace since we're using libinterpreter VM
+                        // Tracers can access g_currentInterpreterVM for stack/memory data
+                        m_tracer->CaptureState(pc, op, gasCost, currentGas, nullptr, m_ext.get());
+                        
+                        // Clear the reference after tracer call
+                        g_currentInterpreterVM = nullptr;
                     } catch (const std::exception& e) {
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName << ": " << e.what();
@@ -364,8 +371,8 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                 }
             });
 
-            // Create VM instance. Force Legacy VM if tracing requested to ensure tracer compatibility.
-            auto vm = m_tracer ? VMFactory::create(VMKind::Legacy) : VMFactory::create();
+            // Create VM instance. Force Interpreter if tracing requested.
+            auto vm = VMFactory::create();
             if (m_isCreation)
             {
 				m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
