@@ -22,16 +22,16 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	r["depth"] = ext.depth + 1;  // depth in standard trace is 1-based
 
 	// Try to get stack/memory from libinterpreter VM via global reference
-	extern const dev::eth::VM* g_currentInterpreterVM;
+	extern const dev::eth::VM* g_currentVM;
 	
 	// Handle stack capture - use libinterpreter VM directly
 	mcp::json stack = mcp::json::array();
-	if (!m_options.disableStack && g_currentInterpreterVM)
+	if (!m_options.disableStack && g_currentVM)
 	{
 		// Access stack from libinterpreter VM
-		auto stackPtr = g_currentInterpreterVM->getStackPointer();
-		auto stackEnd = g_currentInterpreterVM->getStackEnd();
-		size_t stackSize = g_currentInterpreterVM->getStackSize();
+		auto stackPtr = g_currentVM->getStackPointer();
+		auto stackEnd = g_currentVM->getStackEnd();
+		size_t stackSize = g_currentVM->getStackSize();  // Using const method
 		
 		// Stack grows from high address to low address
 		for (size_t i = 0; i < stackSize; ++i) {
@@ -45,9 +45,9 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 
 	// Handle memory capture - use libinterpreter VM directly
 	mcp::json memJson(mcp::json::array());
-	if (m_options.enableMemory && g_currentInterpreterVM)
+	if (m_options.enableMemory && g_currentVM)
 	{
-		bytes const& memory = g_currentInterpreterVM->getMemory();
+		bytes const& memory = g_currentVM->getMemory();
 		for (unsigned i = 0; i < memory.size(); i += 32)
 		{
 			bytesConstRef memRef(memory.data() + i, 32);
