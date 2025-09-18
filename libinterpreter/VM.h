@@ -14,6 +14,7 @@
 #include <boost/optional.hpp>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace dev
 {
@@ -66,6 +67,12 @@ public:
 
     // Set opcode logging callback for debugging
     void setOpcodeLogCallback(const OpcodeLogCallback& callback) { m_opcodeLogCallback = callback; }
+
+    /// Returns a copy of the current EVM stack from top (index 0) to bottom.
+    std::vector<intx::uint256> stack() const;
+
+    /// Returns a reference to the VM memory buffer.
+    bytes const& memory() const { return m_mem; }
 
     uint64_t m_io_gas = 0;
 private:

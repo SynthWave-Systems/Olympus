@@ -1,7 +1,6 @@
 #include "Executive.hpp"
 #include "ExtVM.h"
 
-#include <libevm/LegacyVM.h>
 #include <libevm/VMFactory.h>
 #include <libinterpreter/VM.h>
 #include <mcp/common/Exceptions.h>
@@ -15,33 +14,6 @@ using namespace std;
 using namespace dev;
 using namespace dev::eth;
 using namespace dev::eth;
-
-namespace
-{
-	std::string dumpStackAndMemory(LegacyVM const& _vm)
-	{
-		ostringstream o;
-		o << "\n    STACK\n";
-		for (auto i : _vm.stack())
-			o << (h256)i << "\n";
-		o << "    MEMORY\n"
-			<< ((_vm.memory().size() > 1000) ? " mem size greater than 1000 bytes " :
-				memDump(_vm.memory()));
-		return o.str();
-	};
-
-	std::string dumpStorage(ExtVM const& _ext)
-	{
-		ostringstream o;
-		o << "    STORAGE\n";
-		for (auto const& i : _ext.state().storage(_ext.myAddress))
-			o << showbase << hex << i.second.first << ": " << i.second.second << "\n";
-		return o.str();
-	};
-
-}  // namespace
-
-
 
 mcp::Executive::Executive(chain_state& io_s, Block const& _block, unsigned _txIndex, chain const& _bc, unsigned _level, std::shared_ptr<EVMLogger> _tracer)
 	: m_s(createIntermediateState(io_s, _block, _txIndex, _bc)),
@@ -339,16 +311,16 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
             g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
                 // Log to BOOST_LOG for debugging output
-                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
-                                      << " PC=" << pc << " OP=" << opName 
+                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed()
+                                      << " PC=" << pc << " OP=" << opName
                                       << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
-                
+
                 // Connect to shared_ptr tracer for structured tracing
                 if (m_tracer && m_ext) {
-                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
-                    // The tracer should handle this gracefully
+                    // Forward the VM pointer when available so tracers can inspect runtime state
                     try {
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
+                        dev::eth::VMFace const* vmFace = dynamic_cast<dev::eth::VMFace const*>(vm);
+                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), vmFace, m_ext.get());
                     } catch (...) {
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
