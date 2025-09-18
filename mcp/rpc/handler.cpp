@@ -1673,13 +1673,16 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 	{
 		BOOST_THROW_EXCEPTION(RPC_Error_NoResult());
 	}
+	catch (std::exception const& e)
+	{
+		BOOST_THROW_EXCEPTION(RPC_Error_InternalError(std::string("Transaction tracing failed: ") + e.what()));
+	}
 }
 
 void mcp::rpc_handler::traceTransaction(mcp::Executive& _e, mcp::Transaction const& _t)
 {
-	// Initialize, execute, and finalize the transaction with tracing enabled
+	// Initialize and execute the transaction with tracing enabled
 	_e.initialize(_t);
-	if (!_e.execute())
-		_e.go();  // This will trigger opcode logging via g_opcodeLogCallback and tracer->CaptureState
+	_e.execute();  // This will call create() or call() which internally call go() for actual execution
 	_e.finalize();
 }

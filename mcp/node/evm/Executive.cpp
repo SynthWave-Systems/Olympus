@@ -336,12 +336,24 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//mcp::uint256_t start_gas_used = gasUsed();
 			//int64_t start_refunds = m_ext->sub.refunds;
 
-            // Set up opcode logging callback for debugging - prefer VM direct tracer integration
+            // Set up opcode logging callback - this is the primary integration point for tracing
+            // The VM may not call the tracer directly, so we use the callback to capture opcodes
             g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
                 // Log to BOOST_LOG for debugging output
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
                                       << " PC=" << pc << " OP=" << opName 
                                       << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
+                
+                // Call tracer with the best information available
+                if (m_tracer && m_ext) {
+                    try {
+                        // Pass the VM pointer if available for better tracing information
+                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), vm, m_ext.get());
+                    } catch (...) {
+                        // Protect against tracer failures affecting VM execution
+                        BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
+                    }
+                }
             });
 
             // Create VM instance. Force Interpreter if tracing requested.
