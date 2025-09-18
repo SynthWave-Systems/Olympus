@@ -36,9 +36,9 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 		// Stack grows from high address to low address
 		for (size_t i = 0; i < stackSize; ++i) {
 			auto& stackItem = stackPtr[i];
-			// Convert intx::uint256 to dev::u256 and then to hex
-			dev::u256 value = static_cast<dev::u256>(stackItem);
-			stack.push_back(toCompactHexPrefixedTrim(value));
+			// Convert intx::uint256 to hex string using intx::hex
+			std::string hexValue = "0x" + intx::hex(stackItem);
+			stack.push_back(hexValue);
 		}
 	}
 	r["stack"] = stack;
