@@ -5,8 +5,7 @@
 #include <mcp/core/param.hpp>
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
-//#include <mcp/node/debug.hpp>
-//#include <mcp/node/tracers/OpCode.hpp>
+#include <mcp/node/tracers/Tracer.hpp>
 
 
 mcp::rpc_handler::rpc_handler(mcp::rpc &rpc_a, std::string const &body_a, std::function<void(mcp::json const &)> const &response_a/*, int m_cap*/) : 
@@ -1655,8 +1654,8 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 		mcp::ExecutionResult er;
 		std::shared_ptr<Tracer> tracer = NewTracer(tracerOptions, er);
 		
-		// Create state and executive - the Executive constructor will set up proper intermediate state
-		chain_state s(chain_state::Null);
+		// Create state from the block's state - this ensures we have the correct state context
+		chain_state s = block.state();
 		Executive executive(s, block, t.transactionIndex(), client()->blockChain(), tracer);
 		executive.setResultRecipient(er);
 		
