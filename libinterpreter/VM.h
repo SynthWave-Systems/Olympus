@@ -69,7 +69,7 @@ public:
 
     // Tracer support methods - provide access to VM state for tracing
     bytes const& getMemory() const { return m_mem; }
-    size_t getStackSize() const { return stackSize(); }
+    size_t getStackSize() const { return m_stackEnd - m_SP; }
     intx::uint256 const* getStackPointer() const { return m_SP; }
     intx::uint256 const* getStackEnd() const { return m_stackEnd; }
 
