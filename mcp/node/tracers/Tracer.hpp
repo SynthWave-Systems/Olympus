@@ -4,13 +4,17 @@
 #include <libevm/Logger.h>
 #include <mcp/core/common.hpp>
 
+namespace dev { namespace eth { class VM; } }
+
 namespace mcp
 {
-	class Tracer : public dev::eth::EVMLogger
-	{
-		friend class OpCode;
-	public:
-		explicit Tracer() {};
+        class Tracer : public dev::eth::EVMLogger
+        {
+                friend class OpCode;
+        public:
+                explicit Tracer() {};
+
+                virtual void SetCurrentVM(dev::eth::VM const* /*_vm*/) {}
 
 		void CaptureTxStart(uint64_t _gasLimit) override {}
 		void CaptureTxEnd(uint64_t _restGas) override {}
