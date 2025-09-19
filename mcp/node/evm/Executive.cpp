@@ -5,6 +5,7 @@
 #include <libevm/VMFactory.h>
 #include <mcp/common/Exceptions.h>
 #include <mcp/common/stopwatch.hpp>
+#include <mcp/node/tracers/Tracer.hpp>
 
 #include <numeric>
 
@@ -306,6 +307,7 @@ bool mcp::Executive::go(dev::eth::OnOpFunc const& _onOp)
 	//mcp::stopwatch_guard sw("Executive:go");
     if (m_ext)
     {
+        mcp::tracing::ContextGuard tracerContext(m_ext.get(), static_cast<unsigned>(m_ext->depth));
 #if ETH_TIMED_EXECUTIONS
         Timer t;
 #endif
