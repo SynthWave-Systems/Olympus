@@ -338,7 +338,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                 {
                     try
                     {
-                        m_tracer->CaptureState(pc, op, gasCost, gasLeft, interpreterVm, m_ext.get());
+                        m_tracer->CaptureState(pc, op, gasCost, gasLeft, nullptr, m_ext.get());
                     }
                     catch (...)
                     {
