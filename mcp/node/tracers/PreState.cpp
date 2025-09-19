@@ -119,6 +119,10 @@ void mcp::PreStateTracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUse
 void mcp::PreStateTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
     auto vm = dynamic_cast<LegacyVM const*>(_vm);
+    // Skip processing if VM is not available (e.g., when using interpreter VM with nullptr VMFace)
+    if (!vm)
+        return;
+        
     u256s stackData = vm->stack();
     auto stackLen = stackData.size();
     auto caller = voidExt->myAddress;
