@@ -147,14 +147,25 @@ void mcp::OpCodeTracer::CaptureOpcodeExecution(uint64_t pc, dev::eth::Instructio
 
 	r["pc"] = pc;
 	r["op"] = opName;
-	r["gas"] = static_cast<uint64_t>(0); // VM doesn't provide gas info directly, set to 0 for now
-	r["gasCost"] = static_cast<uint64_t>(0); // VM doesn't provide gasCost info directly
 	r["depth"] = extVM.depth + 1;  // depth in standard trace is 1-based
+	
+	// For direct VM integration, we may not have gas information readily available
+	// This is a limitation of the direct approach, but we can set reasonable defaults
+	r["gas"] = static_cast<uint64_t>(0); // TODO: Extract from VM state if possible
+	r["gasCost"] = static_cast<uint64_t>(0); // TODO: Extract from VM state if possible
 
-	// We can add more details here if we can access VM state
-	// For now, we'll create a minimal trace entry
-	// TODO: Enhance with memory, stack, storage if VM provides access
-
+	// Try to extract additional state information if VM is accessible
+	// Note: The libinterpreter VM might not expose all the same interfaces as LegacyVM
+	// For now, we'll focus on basic opcode tracking and can enhance later
+	
+	// TODO: If we can access VM internals, add:
+	// - Stack information
+	// - Memory information (if enableMemory is true)
+	// - Storage information (if not disableStorage and relevant opcodes)
+	
+	// Basic implementation - captures opcode execution without detailed VM state
+	// This provides the core transaction execution tracing capability
+	
 	m_outValue.push_back(r);
 }
 
