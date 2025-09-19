@@ -67,22 +67,6 @@ public:
     // Set opcode logging callback for debugging
     void setOpcodeLogCallback(const OpcodeLogCallback& callback) { m_opcodeLogCallback = callback; }
 
-    // Public accessors for tracers to access VM state without casting to LegacyVM
-    const bytes& memory() const { return m_mem; }
-    
-    // Stack access for tracers - returns stack contents from bottom to top
-    std::vector<intx::uint256> getStack() const {
-        std::vector<intx::uint256> result;
-        // Stack grows towards smaller addresses, so we iterate from SP to stackEnd
-        for (auto it = m_SP; it < m_stackEnd; ++it) {
-            result.push_back(*it);
-        }
-        return result;
-    }
-    
-    // Gas cost access for tracers
-    uint64_t getCurrentGasCost() const { return m_runGas; }
-
     uint64_t m_io_gas = 0;
 private:
     const evmc_host_interface* m_host = nullptr;
