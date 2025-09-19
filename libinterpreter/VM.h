@@ -14,6 +14,7 @@
 #include <boost/optional.hpp>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace dev
 {
@@ -63,6 +64,12 @@ public:
 
     owning_bytes_ref exec(const evmc_host_interface* _host, evmc_host_context* _context,
         evmc_revision _rev, const evmc_message* _msg, uint8_t const* _code, size_t _codeSize);
+
+    /// Expose execution context for tracers.
+    const bytes& memory() const { return m_mem; }
+    std::vector<intx::uint256> stackIntx() const;
+    uint64_t gasLeft() const { return m_io_gas; }
+    uint64_t currentGasCost() const { return m_runGas; }
 
     // Set opcode logging callback for debugging
     void setOpcodeLogCallback(const OpcodeLogCallback& callback) { m_opcodeLogCallback = callback; }

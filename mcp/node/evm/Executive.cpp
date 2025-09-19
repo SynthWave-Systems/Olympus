@@ -8,8 +8,10 @@
 #include <mcp/common/stopwatch.hpp>
 #include <mcp/core/param.hpp>
 #include <mcp/node/chain.hpp>
+#include <mcp/node/tracers/Tracer.hpp>
 #include <numeric>
 #include <iomanip>
+#include <limits>
 
 using namespace std;
 using namespace dev;
@@ -339,21 +341,38 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
             // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
             g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
                 // Log to BOOST_LOG for debugging output
-                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
-                                      << " PC=" << pc << " OP=" << opName 
+                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed()
+                                      << " PC=" << pc << " OP=" << opName
                                       << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
-                
-                // Connect to shared_ptr tracer for structured tracing
-                if (m_tracer && m_ext) {
-                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
-                    // The tracer should handle this gracefully
-                    try {
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
-                    } catch (...) {
-                        // Protect against tracer failures affecting VM execution
+
+                auto tracerPtr = std::dynamic_pointer_cast<mcp::Tracer>(m_tracer);
+                if (tracerPtr)
+                    tracerPtr->SetCurrentVM(vm);
+
+                uint64_t gasCost = vm ? vm->currentGasCost() : 0;
+                uint64_t gasLeft = 0;
+                if (vm)
+                    gasLeft = vm->gasLeft();
+                else
+                {
+                    static const u256 maxGas64 = u256(std::numeric_limits<uint64_t>::max());
+                    gasLeft = m_gas > maxGas64 ? std::numeric_limits<uint64_t>::max() : m_gas.convert_to<uint64_t>();
+                }
+
+                if (m_tracer && m_ext)
+                {
+                    try
+                    {
+                        m_tracer->CaptureState(pc, op, gasCost, gasLeft, nullptr, m_ext.get());
+                    }
+                    catch (...)
+                    {
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
                     }
                 }
+
+                if (tracerPtr)
+                    tracerPtr->SetCurrentVM(nullptr);
             });
 
             // Create VM instance. Force Interpreter if tracing requested.
