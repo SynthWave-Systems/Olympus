@@ -79,6 +79,9 @@ public:
         }
         return result;
     }
+    
+    // Gas cost access for tracers
+    uint64_t getCurrentGasCost() const { return m_runGas; }
 
     uint64_t m_io_gas = 0;
 private:

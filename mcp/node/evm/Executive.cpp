@@ -349,8 +349,13 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                     
                     // Call tracer CaptureState with proper VM context
                     try {
-                        // Calculate gas cost - this should be improved to get actual gas cost from VM
-                        uint64_t gasCost = 0; // TODO: Get actual gas cost from VM
+                        // Get actual gas cost from VM if available, otherwise use 0
+                        uint64_t gasCost = 0;
+                        try {
+                            gasCost = vm->getCurrentGasCost();
+                        } catch (...) {
+                            // If VM doesn't support getCurrentGasCost, use 0
+                        }
                         m_tracer->CaptureState(pc, op, gasCost, static_cast<uint64_t>(m_gas), vm, m_ext.get());
                     } catch (...) {
                         // Protect against tracer failures affecting VM execution
