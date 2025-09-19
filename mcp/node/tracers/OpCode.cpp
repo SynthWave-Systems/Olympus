@@ -1,5 +1,4 @@
 #include "OpCode.hpp"
-#include <libevm/LegacyVM.h>
 #include <libinterpreter/VM.h>
 #include <mcp/node/evm/ExtVM.h>
 #include <algorithm>
@@ -34,14 +33,13 @@ namespace
 }
 
 void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
-        uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
+        uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* /*_vm*/, dev::eth::ExtVMFace const* voidExt)
 {
         // check if already accumulated the specified number of logs
         if (m_options.limit != 0 && m_options.limit <= m_outValue.size())
                 return;
 
         ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
-        auto legacyVm = dynamic_cast<LegacyVM const*>(_vm);
         auto interpreterVm = m_currentInterpreterVm;
 
         mcp::json r = mcp::json::object();
@@ -53,14 +51,7 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
         r["depth"] = ext.depth + 1;  // depth in standard trace is 1-based
 
         mcp::json stack = mcp::json::array();
-        if (legacyVm && !m_options.disableStack)
-        {
-                for (auto const& i : legacyVm->stack())
-                        stack.push_back(toCompactHexPrefixedTrim(i));
-
-                r["stack"] = stack;
-        }
-        else if (interpreterVm && !m_options.disableStack)
+        if (interpreterVm && !m_options.disableStack)
         {
                 for (auto const& value : interpreterVm->stackIntx())
                         stack.push_back(toCompactHexFromIntx(value));
@@ -68,22 +59,7 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
                 r["stack"] = stack;
         }
 
-        if (legacyVm)
-        {
-                bytes const& memory = legacyVm->memory();
-
-                if (m_options.enableMemory)
-                {
-                        mcp::json memJson(mcp::json::array());
-                        for (unsigned i = 0; i < memory.size(); i += 32)
-                        {
-                                bytesConstRef memRef(memory.data() + i, 32);
-                                memJson.push_back(toHex(memRef));
-                        }
-                        r["memory"] = memJson;
-                }
-        }
-        else if (interpreterVm)
+        if (interpreterVm)
         {
                 bytes const& memory = interpreterVm->memory();
 

@@ -1,7 +1,6 @@
 #include "Executive.hpp"
 #include "ExtVM.h"
 
-#include <libevm/LegacyVM.h>
 #include <libevm/VMFactory.h>
 #include <libinterpreter/VM.h>
 #include <mcp/common/Exceptions.h>
@@ -17,33 +16,6 @@ using namespace std;
 using namespace dev;
 using namespace dev::eth;
 using namespace dev::eth;
-
-namespace
-{
-	std::string dumpStackAndMemory(LegacyVM const& _vm)
-	{
-		ostringstream o;
-		o << "\n    STACK\n";
-		for (auto i : _vm.stack())
-			o << (h256)i << "\n";
-		o << "    MEMORY\n"
-			<< ((_vm.memory().size() > 1000) ? " mem size greater than 1000 bytes " :
-				memDump(_vm.memory()));
-		return o.str();
-	};
-
-	std::string dumpStorage(ExtVM const& _ext)
-	{
-		ostringstream o;
-		o << "    STORAGE\n";
-		for (auto const& i : _ext.state().storage(_ext.myAddress))
-			o << showbase << hex << i.second.first << ": " << i.second.second << "\n";
-		return o.str();
-	};
-
-}  // namespace
-
-
 
 mcp::Executive::Executive(chain_state& io_s, Block const& _block, unsigned _txIndex, chain const& _bc, unsigned _level, std::shared_ptr<EVMLogger> _tracer)
 	: m_s(createIntermediateState(io_s, _block, _txIndex, _bc)),
