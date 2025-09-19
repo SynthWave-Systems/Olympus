@@ -345,10 +345,17 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                 
                 // Connect to shared_ptr tracer for structured tracing
                 if (m_tracer && m_ext) {
-                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
-                    // The tracer should handle this gracefully
                     try {
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
+                        // Calculate gas cost from VM metrics
+                        uint64_t gasCost = 0;
+                        if (vm && vm->m_io_gas > 0) {
+                            // Use current gas as an approximation for gas cost calculation
+                            gasCost = static_cast<uint64_t>(m_gas) > vm->m_io_gas ? 
+                                     static_cast<uint64_t>(m_gas) - vm->m_io_gas : 0;
+                        }
+                        
+                        m_tracer->CaptureState(pc, op, gasCost, vm ? vm->m_io_gas : static_cast<uint64_t>(m_gas), 
+                                             nullptr, m_ext.get());
                     } catch (...) {
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
