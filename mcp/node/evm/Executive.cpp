@@ -310,8 +310,11 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//mcp::uint256_t start_gas_used = gasUsed();
 			//int64_t start_refunds = m_ext->sub.refunds;
 
-            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
+            // Set up opcode logging callback for debugging with interpreter context
+            auto vm = VMFactory::create();
+            dev::eth::VM const* interpreterVm = dynamic_cast<dev::eth::VM*>(vm.get());
+
+            g_opcodeLogCallback = OpcodeLogCallback([this, interpreterVm](uint64_t pc, Instruction op, const std::string& opName) {
                 // Log to BOOST_LOG for debugging output
                 BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed()
                                       << " PC=" << pc << " OP=" << opName
@@ -319,12 +322,12 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 
                 auto tracerPtr = std::dynamic_pointer_cast<mcp::Tracer>(m_tracer);
                 if (tracerPtr)
-                    tracerPtr->SetCurrentVM(vm);
+                    tracerPtr->SetCurrentVM(interpreterVm);
 
-                uint64_t gasCost = vm ? vm->currentGasCost() : 0;
+                uint64_t gasCost = interpreterVm ? interpreterVm->currentGasCost() : 0;
                 uint64_t gasLeft = 0;
-                if (vm)
-                    gasLeft = vm->gasLeft();
+                if (interpreterVm)
+                    gasLeft = interpreterVm->gasLeft();
                 else
                 {
                     static const u256 maxGas64 = u256(std::numeric_limits<uint64_t>::max());
@@ -335,7 +338,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                 {
                     try
                     {
-                        m_tracer->CaptureState(pc, op, gasCost, gasLeft, nullptr, m_ext.get());
+                        m_tracer->CaptureState(pc, op, gasCost, gasLeft, interpreterVm, m_ext.get());
                     }
                     catch (...)
                     {
@@ -346,9 +349,6 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                 if (tracerPtr)
                     tracerPtr->SetCurrentVM(nullptr);
             });
-
-            // Create VM instance. Force Interpreter if tracing requested.
-            auto vm = VMFactory::create();
             if (m_isCreation)
             {
 				m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
