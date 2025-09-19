@@ -8,6 +8,7 @@
 #include <mcp/common/stopwatch.hpp>
 #include <mcp/core/param.hpp>
 #include <mcp/node/chain.hpp>
+#include <mcp/node/tracers/OpCode.hpp>
 #include <numeric>
 #include <iomanip>
 
@@ -336,28 +337,60 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//mcp::uint256_t start_gas_used = gasUsed();
 			//int64_t start_refunds = m_ext->sub.refunds;
 
-            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
-                // Log to BOOST_LOG for debugging output
-                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
-                                      << " PC=" << pc << " OP=" << opName 
-                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
-                
-                // Connect to shared_ptr tracer for structured tracing
-                if (m_tracer && m_ext) {
-                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
-                    // The tracer should handle this gracefully
-                    try {
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
-                    } catch (...) {
-                        // Protect against tracer failures affecting VM execution
-                        BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
-                    }
-                }
-            });
+            // Set up tracing - instead of global callback, hook directly into OpCodeTracer if possible
+            std::shared_ptr<mcp::OpCodeTracer> opcodeTracer;
+            if (m_tracer) {
+                // Try to cast to OpCodeTracer to enable direct integration
+                opcodeTracer = std::dynamic_pointer_cast<mcp::OpCodeTracer>(m_tracer);
+            }
 
             // Create VM instance. Force Interpreter if tracing requested.
             auto vm = VMFactory::create();
+            
+            // If we have an OpCodeTracer, set up direct VM integration
+            if (opcodeTracer && m_ext) {
+                // Try to cast to libinterpreter VM to set instance-level callback
+                auto interpreterVM = dynamic_cast<dev::eth::VM*>(vm.get());
+                if (interpreterVM) {
+                    // Set the instance-level callback directly on the VM
+                    interpreterVM->setOpcodeLogCallback(opcodeTracer->CreateCallback(m_ext.get()));
+                    
+                    // Log the direct integration
+                    BOOST_LOG(m_log.debug) << "OpCodeTracer: Direct VM integration enabled for TxHash=" << m_t.sha3().hexPrefixed();
+                } else {
+                    // Fallback to global callback if direct integration isn't possible
+                    g_opcodeLogCallback = OpcodeLogCallback([this, opcodeTracer](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
+                        // Log to BOOST_LOG for debugging output
+                        BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
+                                              << " PC=" << pc << " OP=" << opName 
+                                              << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
+                        
+                        // Direct call to OpCodeTracer
+                        if (opcodeTracer && m_ext) {
+                            opcodeTracer->CaptureOpcodeExecution(pc, op, opName, vm, m_ext.get());
+                        }
+                    });
+                    BOOST_LOG(m_log.debug) << "OpCodeTracer: Fallback to global callback for TxHash=" << m_t.sha3().hexPrefixed();
+                }
+            } else {
+                // Legacy behavior for non-OpCodeTracer tracers
+                g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
+                    // Log to BOOST_LOG for debugging output
+                    BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
+                                          << " PC=" << pc << " OP=" << opName 
+                                          << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
+                    
+                    // Connect to shared_ptr tracer for structured tracing
+                    if (m_tracer && m_ext) {
+                        try {
+                            m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
+                        } catch (...) {
+                            // Protect against tracer failures affecting VM execution
+                            BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
+                        }
+                    }
+                });
+            }
             if (m_isCreation)
             {
 				m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);

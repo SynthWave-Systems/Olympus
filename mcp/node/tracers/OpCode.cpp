@@ -3,7 +3,8 @@
 #include <mcp/node/evm/ExtVM.h>
 
 using namespace dev::eth;
-void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
+
+void mcp::OpCodeTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
 	// check if already accumulated the specified number of logs
@@ -100,19 +101,19 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	m_outValue.push_back(r);
 }
 
-mcp::json mcp::OpCode::GetResult()
+mcp::json mcp::OpCodeTracer::GetResult()
 {
 	mcp::json ret;
-	ret["gas"] = m_res->gasUsed.convert_to<uint64_t>()/*toJS(t.gas())*/;
+	ret["gas"] = m_res->gasUsed.convert_to<uint64_t>();
 	ret["failed"] = m_res->Failed();
 	ret["returnValue"] = toHex(m_res->output);
 	ret["structLogs"] = m_outValue;
 	return ret;
 }
 
-mcp::OpCode::DebugOptions mcp::OpCode::debugOptions(mcp::json const& _json)
+mcp::OpCodeTracer::DebugOptions mcp::OpCodeTracer::debugOptions(mcp::json const& _json)
 {
-	mcp::OpCode::DebugOptions op;
+	mcp::OpCodeTracer::DebugOptions op;
 	if (!_json.is_object() || _json.empty())
 		return op;
 	if (_json.count("enableMemory") && !_json["enableMemory"].empty())
@@ -128,4 +129,39 @@ mcp::OpCode::DebugOptions mcp::OpCode::debugOptions(mcp::json const& _json)
 	if (_json.count("limit") && !_json["limit"].empty())
 		op.limit = _json["limit"].get<int>();
 	return op;
+}
+
+// Enhanced method for direct VM integration
+void mcp::OpCodeTracer::CaptureOpcodeExecution(uint64_t pc, dev::eth::Instruction op, const std::string& opName, const dev::eth::VM* vm, dev::eth::ExtVMFace const* ext)
+{
+	// check if already accumulated the specified number of logs
+	if (m_options.limit != 0 && m_options.limit <= m_outValue.size())
+		return;
+
+	if (!ext)
+		return;
+
+	ExtVM const& extVM = dynamic_cast<ExtVM const&>(*ext);
+
+	mcp::json r = mcp::json::object();
+
+	r["pc"] = pc;
+	r["op"] = opName;
+	r["gas"] = static_cast<uint64_t>(0); // VM doesn't provide gas info directly, set to 0 for now
+	r["gasCost"] = static_cast<uint64_t>(0); // VM doesn't provide gasCost info directly
+	r["depth"] = extVM.depth + 1;  // depth in standard trace is 1-based
+
+	// We can add more details here if we can access VM state
+	// For now, we'll create a minimal trace entry
+	// TODO: Enhance with memory, stack, storage if VM provides access
+
+	m_outValue.push_back(r);
+}
+
+// Create a callback function that can be used with VM's setOpcodeLogCallback
+dev::eth::OpcodeLogCallback mcp::OpCodeTracer::CreateCallback(dev::eth::ExtVMFace const* ext)
+{
+	return [this, ext](uint64_t pc, dev::eth::Instruction op, const std::string& opName, const dev::eth::VM* vm) {
+		this->CaptureOpcodeExecution(pc, op, opName, vm, ext);
+	};
 }
