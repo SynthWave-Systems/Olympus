@@ -2,32 +2,38 @@
 #include <libinterpreter/VM.h>
 #include <mcp/node/evm/ExtVM.h>
 #include <algorithm>
-#include <array>
-#include <iomanip>
 #include <sstream>
 
 using namespace dev::eth;
 namespace
 {
-        std::string toCompactHexFromIntx(intx::uint256 const& value)
+        std::string toCompactHexFromIntx(intx::uint256 value)
         {
-                auto bytes = intx::be::store<std::array<uint8_t, 32>>(value);
-                size_t firstNonZero = 0;
-                while (firstNonZero < bytes.size() && bytes[firstNonZero] == 0)
-                        ++firstNonZero;
-
                 std::ostringstream out;
                 out << "0x";
-                if (firstNonZero == bytes.size())
+
+                if (value == 0)
                 {
                         out << '0';
+                        return out.str();
                 }
-                else
+
+                std::string hex;
+                hex.reserve(64);
+
+                while (value != 0)
                 {
-                        out << std::hex << std::nouppercase << std::setfill('0');
-                        for (size_t i = firstNonZero; i < bytes.size(); ++i)
-                                out << std::setw(2) << static_cast<unsigned>(bytes[i]);
+                        auto nibble = static_cast<unsigned>(value & intx::uint256{0xF});
+                        hex.push_back(nibble < 10 ? static_cast<char>('0' + nibble)
+                                                  : static_cast<char>('a' + (nibble - 10)));
+                        value >>= 4;
                 }
+
+                if (hex.size() % 2 != 0)
+                        hex.push_back('0');
+
+                std::reverse(hex.begin(), hex.end());
+                out << hex;
                 return out.str();
         }
 }
