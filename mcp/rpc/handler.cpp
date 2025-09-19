@@ -174,8 +174,8 @@ void mcp::rpc_handler::accounts_balances(mcp::json &j_response, bool &)
 
 void mcp::rpc_handler::block(mcp::json &j_response, bool &)
 {
-	if (!mcp::isH256(params[0]))
-		BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
+        if (!mcp::isH256(params[0]))
+                BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
 
 	//dev::h256 block_hash = jsToHash(params[0]);
 	//mcp::db::db_transaction transaction(m_store.create_transaction());
@@ -1635,8 +1635,11 @@ void mcp::rpc_handler::approve_receipt(mcp::json &j_response, bool &)
 
 void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 {
-	if (!mcp::isH256(params[0]))
-		BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
+        if (!params.is_array() || params.empty())
+                BOOST_THROW_EXCEPTION(RPC_Error_InvalidParams("Invalid parameters"));
+
+        if (!mcp::isH256(params[0]))
+                BOOST_THROW_EXCEPTION(RPC_Error_JsonParseError(BadHexFormat));
 
 	try 
 	{
@@ -1646,10 +1649,9 @@ void mcp::rpc_handler::debug_traceTransaction(mcp::json &j_response, bool &)
 		Block block = client()->blockByHash(t.blockHash(), true);
 		
 		// Set up tracer options from params[1] (if provided)
-		mcp::json tracerOptions;
-		if (params.size() > 1 && !params[1].is_null()) {
-			tracerOptions = params[1];
-		}
+                mcp::json tracerOptions;
+                if (params.size() > 1 && params[1].is_object())
+                        tracerOptions = params[1];
 		
 		// Create execution result and tracer
 		mcp::ExecutionResult er;
