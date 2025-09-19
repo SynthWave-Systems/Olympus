@@ -4,6 +4,8 @@
 #include "interpreter.h"
 #include "VM.h"
 
+#include <mcp/node/tracers/Tracer.hpp>
+
 //#include <aleth/version.h>
 
 namespace
@@ -154,6 +156,39 @@ uint64_t VM::decodeJumpvDest(const byte* const _code, uint64_t& _pc, byte _voff)
 
     _pc += 1 + n * 2;               // adust inout _pc to opcode after table
     return dest;
+}
+
+
+void VM::onOperation()
+{
+    using namespace mcp::tracing;
+
+    auto* tracer = TracerManager::currentTracer();
+    if (!tracer)
+        return;
+
+    auto const* context = TracerManager::currentContext();
+    if (!context)
+        return;
+
+    OperationState state;
+    state.step = m_nSteps++;
+    state.pc = m_PC;
+    state.opcode = m_OP;
+    state.gasCost = dev::bigint(m_runGas);
+    state.gasLeft = dev::bigint(m_io_gas);
+    state.newMemorySize = dev::bigint(m_newMemSize);
+
+    if (TracerManager::tracerNeedsMemory())
+        state.memory = {m_mem.data(), m_mem.size()};
+
+    if (TracerManager::tracerNeedsStack())
+    {
+        state.stackTop = m_SP;
+        state.stackSize = stackSize();
+    }
+
+    tracer->captureState(state, *context);
 }
 
 
