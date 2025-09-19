@@ -1,5 +1,6 @@
 #include "OpCode.hpp"
 #include <libevm/LegacyVM.h>
+#include <libinterpreter/VM.h>
 #include <mcp/node/evm/ExtVM.h>
 
 using namespace dev::eth;
@@ -11,7 +12,10 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 		return;
 
 	ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
-	auto vm = dynamic_cast<LegacyVM const*>(_vm);
+	
+	// Try to cast to different VM types - LegacyVM or libinterpreter VM
+	auto legacyVm = dynamic_cast<LegacyVM const*>(_vm);
+	auto interpreterVm = dynamic_cast<dev::eth::VM const*>(_vm);
 
 	mcp::json r = mcp::json::object();
 
@@ -27,16 +31,25 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	//	r["memexpand"] = toString(newMemSize);
 
 	mcp::json stack = mcp::json::array();
-	if (vm && !m_options.disableStack)
+	if (!m_options.disableStack)
 	{
 		//mcp::log m_log = { mcp::log("vm") };
 		// Try extracting information about the stack from the VM is supported.
-		for (auto const& i : vm->stack())
-		{
-			//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
-			stack.push_back(toCompactHexPrefixedTrim(i));
+		if (legacyVm) {
+			// Use LegacyVM's stack method
+			for (auto const& i : legacyVm->stack())
+			{
+				//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
+				stack.push_back(toCompactHexPrefixedTrim(i));
+			}
+		} else if (interpreterVm) {
+			// Use libinterpreter VM's stack method
+			for (auto const& i : interpreterVm->stack())
+			{
+				//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
+				stack.push_back(toCompactHexPrefixedTrim(i));
+			}
 		}
-
 		r["stack"] = stack;
 	}
 
@@ -69,21 +82,27 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	//	m_lastInst.resize(ext.depth + 1);
 	//}
 
-	if (vm)
+	// Handle memory access for both VM types
+	bytes const* memory = nullptr;
+	if (legacyVm) {
+		memory = &legacyVm->memory();
+	} else if (interpreterVm) {
+		memory = &interpreterVm->memory();
+	}
+	
+	if (memory)
 	{
-		bytes const& memory = vm->memory();
-
 		mcp::json memJson(mcp::json::array());
 		if (m_options.enableMemory)
 		{
-			for (unsigned i = 0; i < memory.size(); i += 32)
+			for (unsigned i = 0; i < memory->size(); i += 32)
 			{
-				bytesConstRef memRef(memory.data() + i, 32);
+				bytesConstRef memRef(memory->data() + i, 32);
 				memJson.push_back(toHex(memRef));
 			}
 			r["memory"] = memJson;
 		}
-		//r["memSize"] = static_cast<uint64_t>(memory.size());
+		//r["memSize"] = static_cast<uint64_t>(memory->size());
 	}
 
 	if (!m_options.disableStorage &&

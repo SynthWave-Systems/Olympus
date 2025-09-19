@@ -6,6 +6,7 @@
 #include "VMConfig.h"
 
 #include <libevm/VMFace.h>
+#include <libdevcore/Common.h>
 #include <intx/intx.hpp>
 
 #include <evmc/evmc.h>
@@ -101,7 +102,23 @@ private:
     // space for data stack, grows towards smaller addresses from the end
     intx::uint256 m_stack[VMSchedule::stackLimit];
     intx::uint256 *m_stackEnd = &m_stack[VMSchedule::stackLimit];
-    size_t stackSize() { return m_stackEnd - m_SP; }
+    size_t stackSize() const { return m_stackEnd - m_SP; }
+    
+    // Public method to access stack for tracing compatibility with LegacyVM
+    std::vector<dev::u256> stack() const {
+        std::vector<dev::u256> result;
+        result.reserve(stackSize());
+        // Stack grows downward, so iterate from SP to stackEnd 
+        for (auto* it = m_SP; it < m_stackEnd; ++it) {
+            result.push_back(dev::u256{*it});
+        }
+        // Reverse to match LegacyVM format (top of stack first)
+        std::reverse(result.begin(), result.end());
+        return result;
+    }
+    
+    // Public method to access memory for tracing compatibility with LegacyVM
+    bytes const& memory() const { return m_mem; }
     
     // constant pool
     std::vector<intx::uint256> m_pool;
