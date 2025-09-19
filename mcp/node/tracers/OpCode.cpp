@@ -1,6 +1,7 @@
 #include "OpCode.hpp"
-#include <libevm/LegacyVM.h>
+#include <libinterpreter/VM.h>
 #include <mcp/node/evm/ExtVM.h>
+#include <mcp/common/common.hpp>
 
 using namespace dev::eth;
 void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
@@ -11,7 +12,8 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 		return;
 
 	ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
-	auto vm = dynamic_cast<LegacyVM const*>(_vm);
+	// Use the proper VM interface instead of casting to LegacyVM
+	const VM* vm = dynamic_cast<const VM*>(_vm);
 
 	mcp::json r = mcp::json::object();
 
@@ -30,8 +32,9 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	if (vm && !m_options.disableStack)
 	{
 		//mcp::log m_log = { mcp::log("vm") };
-		// Try extracting information about the stack from the VM is supported.
-		for (auto const& i : vm->stack())
+		// Use the new VM interface to get stack contents without relying on LegacyVM
+		auto stackContents = vm->getStack();
+		for (auto const& i : stackContents)
 		{
 			//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
 			stack.push_back(toCompactHexPrefixedTrim(i));
@@ -71,7 +74,7 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 
 	if (vm)
 	{
-		bytes const& memory = vm->memory();
+		const bytes& memory = vm->memory();
 
 		mcp::json memJson(mcp::json::array());
 		if (m_options.enableMemory)

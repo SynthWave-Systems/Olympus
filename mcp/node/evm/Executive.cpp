@@ -336,31 +336,31 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 			//mcp::uint256_t start_gas_used = gasUsed();
 			//int64_t start_refunds = m_ext->sub.refunds;
 
-            // Set up opcode logging callback for debugging - connect both BOOST_LOG and shared_ptr tracer
-            g_opcodeLogCallback = OpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
-                // Log to BOOST_LOG for debugging output
-                BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
-                                      << " PC=" << pc << " OP=" << opName 
-                                      << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
-                
-                // Connect to shared_ptr tracer for structured tracing
-                if (m_tracer && m_ext) {
-                    // Call CaptureState with nullptr for VMFace since we don't have access to it here
-                    // The tracer should handle this gracefully
+            // Create VM instance. Force Interpreter if tracing requested.
+            auto vm = VMFactory::create();
+            
+            // Set up tracer integration with VM's onOperation callback
+            if (m_tracer && m_ext) {
+                vm->setOpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
+                    // Log to BOOST_LOG for debugging output
+                    BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
+                                          << " PC=" << pc << " OP=" << opName 
+                                          << " (0x" << std::hex << static_cast<int>(op) << std::dec << ")";
+                    
+                    // Call tracer CaptureState with proper VM context
                     try {
-                        m_tracer->CaptureState(pc, op, 0, static_cast<uint64_t>(m_gas), nullptr, m_ext.get());
+                        // Calculate gas cost - this should be improved to get actual gas cost from VM
+                        uint64_t gasCost = 0; // TODO: Get actual gas cost from VM
+                        m_tracer->CaptureState(pc, op, gasCost, static_cast<uint64_t>(m_gas), vm, m_ext.get());
                     } catch (...) {
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
                     }
-                }
-            });
-
-            // Create VM instance. Force Interpreter if tracing requested.
-            auto vm = VMFactory::create();
+                });
+            }
             if (m_isCreation)
             {
-				m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
+				m_output = vm->exec(m_gas, *m_ext/*, _onOp*/);
                 if (m_res)
                 {
                     m_res->gasForDeposit = m_gas;
@@ -402,7 +402,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
             }
             else
             //{
-                m_output = vm->exec(m_gas, *m_ext, m_tracer/*, _onOp*/);
+                m_output = vm->exec(m_gas, *m_ext/*, _onOp*/);
 
 				////call trace result 
 				//std::shared_ptr<mcp::call_trace_result> call_result(std::make_shared<mcp::call_trace_result>());
@@ -471,9 +471,6 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 #if ETH_TIMED_EXECUTIONS
         cnote << "VM took:" << t.elapsed() << "; gas used: " << (sgas - m_endGas);
 #endif
-        
-        // Clear the opcode logging callback
-        g_opcodeLogCallback = nullptr;
     }
     return true;
 }
