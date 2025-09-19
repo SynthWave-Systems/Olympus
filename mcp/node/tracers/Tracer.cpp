@@ -31,5 +31,5 @@ std::shared_ptr<Tracer> mcp::NewTracer(mcp::json const& _param, mcp::ExecutionRe
             
     }
 
-    return std::make_shared<OpCode>(_er, _param);
+    return std::make_shared<OpCodeTracer>(_er, _param);
 }
