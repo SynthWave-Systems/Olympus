@@ -33,11 +33,15 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	{
 		//mcp::log m_log = { mcp::log("vm") };
 		// Use the new VM interface to get stack contents without relying on LegacyVM
-		auto stackContents = vm->getStack();
-		for (auto const& i : stackContents)
-		{
-			//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
-			stack.push_back(toCompactHexPrefixedTrim(i));
+		try {
+			auto stackContents = vm->getStack();
+			for (auto const& i : stackContents)
+			{
+				//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
+				stack.push_back(toCompactHexPrefixedTrim(i));
+			}
+		} catch (...) {
+			// If VM doesn't support new interface, stack will remain empty
 		}
 
 		r["stack"] = stack;
@@ -74,17 +78,21 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 
 	if (vm)
 	{
-		const bytes& memory = vm->memory();
+		try {
+			const bytes& memory = vm->memory();
 
-		mcp::json memJson(mcp::json::array());
-		if (m_options.enableMemory)
-		{
-			for (unsigned i = 0; i < memory.size(); i += 32)
+			mcp::json memJson(mcp::json::array());
+			if (m_options.enableMemory)
 			{
-				bytesConstRef memRef(memory.data() + i, 32);
-				memJson.push_back(toHex(memRef));
+				for (unsigned i = 0; i < memory.size(); i += 32)
+				{
+					bytesConstRef memRef(memory.data() + i, 32);
+					memJson.push_back(toHex(memRef));
+				}
+				r["memory"] = memJson;
 			}
-			r["memory"] = memJson;
+		} catch (...) {
+			// If VM doesn't support new interface, memory will remain empty
 		}
 		//r["memSize"] = static_cast<uint64_t>(memory.size());
 	}

@@ -341,7 +341,7 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
             
             // Set up tracer integration with VM's onOperation callback
             if (m_tracer && m_ext) {
-                vm->setOpcodeLogCallback([this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
+                auto tracerCallback = [this](uint64_t pc, Instruction op, const std::string& opName, const VM* vm) {
                     // Log to BOOST_LOG for debugging output
                     BOOST_LOG(m_log.trace) << "EVM Opcode: TxHash=" << m_t.sha3().hexPrefixed() 
                                           << " PC=" << pc << " OP=" << opName 
@@ -356,7 +356,15 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
                         // Protect against tracer failures affecting VM execution
                         BOOST_LOG(m_log.debug) << "Tracer CaptureState failed for PC=" << pc << " OP=" << opName;
                     }
-                });
+                };
+                
+                try {
+                    vm->setOpcodeLogCallback(tracerCallback);
+                } catch (...) {
+                    // If VM doesn't support setOpcodeLogCallback, fall back to global callback
+                    BOOST_LOG(m_log.debug) << "VM doesn't support setOpcodeLogCallback, using global callback";
+                    g_opcodeLogCallback = tracerCallback;
+                }
             }
             if (m_isCreation)
             {
@@ -471,6 +479,11 @@ bool mcp::Executive::go(/*dev::eth::OnOpFunc const& _onOp*/)
 #if ETH_TIMED_EXECUTIONS
         cnote << "VM took:" << t.elapsed() << "; gas used: " << (sgas - m_endGas);
 #endif
+        
+        // Clear the global opcode logging callback if it was used as fallback
+        if (g_opcodeLogCallback) {
+            g_opcodeLogCallback = nullptr;
+        }
     }
     return true;
 }
