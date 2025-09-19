@@ -106,6 +106,10 @@ void mcp::CallTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint
         return;
 
     auto vm = dynamic_cast<LegacyVM const*>(_vm);
+    // Skip processing if VM is not available (e.g., when using interpreter VM with nullptr VMFace)
+    if (!vm)
+        return;
+        
     int size = (uint8_t)inst - (uint8_t)Instruction::LOG0;
     u256s stackData = vm->stack();
     int64_t mStart = stackData[stackData.size() - 1].convert_to<int64_t>();
