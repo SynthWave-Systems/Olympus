@@ -14,6 +14,7 @@
 #include <boost/optional.hpp>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace dev
 {
@@ -48,8 +49,8 @@ struct VMSchedule
     static constexpr int64_t callSelfGas = 40;
 };
 
-// Callback type for logging opcodes during execution with enhanced context
-using OpcodeLogCallback = std::function<void(uint64_t pc, Instruction op, const std::string& opName, const VM* vm)>;
+// Callback type for logging opcodes during execution.
+using OpcodeLogCallback = std::function<void(uint64_t pc, Instruction op, const std::string& opName)>;
 
 // Global callback for opcode logging - can be set by Executive
 extern OpcodeLogCallback g_opcodeLogCallback;
@@ -63,6 +64,12 @@ public:
 
     owning_bytes_ref exec(const evmc_host_interface* _host, evmc_host_context* _context,
         evmc_revision _rev, const evmc_message* _msg, uint8_t const* _code, size_t _codeSize);
+
+    /// Expose execution context for tracers.
+    const bytes& memory() const { return m_mem; }
+    std::vector<intx::uint256> stackIntx() const;
+    uint64_t gasLeft() const { return m_io_gas; }
+    uint64_t currentGasCost() const { return m_runGas; }
 
     // Set opcode logging callback for debugging
     void setOpcodeLogCallback(const OpcodeLogCallback& callback) { m_opcodeLogCallback = callback; }
@@ -149,12 +156,15 @@ private:
 
     void onOperation() {
         // Try instance callback first, then global callback with VM context
-        if (m_opcodeLogCallback) {
+        if (m_opcodeLogCallback)
+        {
             std::string opName = getInstructionName(m_OP);
-            m_opcodeLogCallback(m_PC, m_OP, opName, this);
-        } else if (g_opcodeLogCallback) {
+            m_opcodeLogCallback(m_PC, m_OP, opName);
+        }
+        else if (g_opcodeLogCallback)
+        {
             std::string opName = getInstructionName(m_OP);
-            g_opcodeLogCallback(m_PC, m_OP, opName, this);
+            g_opcodeLogCallback(m_PC, m_OP, opName);
         }
     }
     void adjustStack(int _removed, int _added);
