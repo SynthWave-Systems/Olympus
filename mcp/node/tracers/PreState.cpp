@@ -1,5 +1,6 @@
 #include "PreState.hpp"
 #include <libevm/LegacyVM.h>
+#include <libinterpreter/VM.h>
 #include <libdevcore/CommonJS.h>
 //#include <mcp/node/evm/ExtVM.h>
 
@@ -118,8 +119,20 @@ void mcp::PreStateTracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUse
 
 void mcp::PreStateTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
-    auto vm = dynamic_cast<LegacyVM const*>(_vm);
-    u256s stackData = vm->stack();
+    // Try to cast to different VM types
+    auto legacyVm = dynamic_cast<LegacyVM const*>(_vm);
+    auto interpreterVm = dynamic_cast<dev::eth::VM const*>(_vm);
+    
+    u256s stackData;
+    if (legacyVm) {
+        stackData = legacyVm->stack();
+    } else if (interpreterVm) {
+        stackData = interpreterVm->stack();
+    } else {
+        // No VM available, can't access stack
+        return;
+    }
+    
     auto stackLen = stackData.size();
     auto caller = voidExt->myAddress;
 
@@ -156,12 +169,21 @@ void mcp::PreStateTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, 
     {
         int64_t offset = stackData[stackLen - 2].convert_to<int64_t>();
         int64_t size = stackData[stackLen - 3].convert_to<int64_t>();
-        bytes const& memory = vm->memory();
-        bytesConstRef init = bytesConstRef(memory.data() + offset, size);
-        h256 salt = stackData[stackLen - 4];
-        dev::Address addr = right160(sha3(bytes{ 0xff } + caller.asBytes() + toBigEndian(salt) + sha3(init)));
-        lookupAccount(addr);
-        created[addr] = true;
+        
+        bytes const* memory = nullptr;
+        if (legacyVm) {
+            memory = &legacyVm->memory();
+        } else if (interpreterVm) {
+            memory = &interpreterVm->memory();
+        }
+        
+        if (memory) {
+            bytesConstRef init = bytesConstRef(memory->data() + offset, size);
+            h256 salt = stackData[stackLen - 4];
+            dev::Address addr = right160(sha3(bytes{ 0xff } + caller.asBytes() + toBigEndian(salt) + sha3(init)));
+            lookupAccount(addr);
+            created[addr] = true;
+        }
     }
 }
 
