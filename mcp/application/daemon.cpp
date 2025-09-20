@@ -9,6 +9,7 @@
 #include <mcp/node/witness.hpp>
 #include <mcp/node/requesting.hpp>
 #include <mcp/common/log.hpp>
+#include <mcp/rpc/rpc_ws.hpp>
 
 mcp::thread_runner::thread_runner(boost::asio::io_service & service_a, unsigned service_threads_a, std::string const &service_name)
 {
@@ -834,26 +835,26 @@ void mcp_daemon::daemon::run(boost::filesystem::path const &data_path, boost::pr
 			LOG(m_log.info) << "RPC is disabled";
 		}
 
-		//std::shared_ptr<mcp::rpc_ws> rpc_ws = get_rpc_ws(io_service, background, config.rpc_ws);
-		//if (config.rpc_ws.rpc_ws_enable)
-		//{
-		//	rpc_ws->start();
-		//	rpc_ws->register_subscribe("new_block");
-		//	rpc_ws->register_subscribe("stable_block");
-		//	chain->set_ws_new_block_func(
-		//		std::bind(&mcp::rpc_ws::on_new_block, rpc_ws, std::placeholders::_1)
-		//	);
-		//	chain->set_ws_stable_block_func(
-		//		std::bind(&mcp::rpc_ws::on_stable_block, rpc_ws, std::placeholders::_1)
-		//	);
-		//	chain->set_ws_stable_mci_func(
-		//		std::bind(&mcp::rpc_ws::on_stable_mci, rpc_ws, std::placeholders::_1)
-		//	);
-		//}
-		//else
-		//{
-		//	LOG(m_log.info) << "WebSocket RPC is disabled";
-		//}
+		std::shared_ptr<mcp::rpc_ws> rpc_ws = get_rpc_ws(io_service, background, config.rpc_ws, *rpc);
+		if (config.rpc_ws.rpc_ws_enable)
+		{
+			rpc_ws->start();
+			rpc_ws->register_subscribe("new_block");
+			rpc_ws->register_subscribe("stable_block");
+			chain->set_ws_new_block_func(
+				std::bind(&mcp::rpc_ws::on_new_block, rpc_ws, std::placeholders::_1)
+			);
+			chain->set_ws_stable_block_func(
+				std::bind(&mcp::rpc_ws::on_stable_block, rpc_ws, std::placeholders::_1)
+			);
+			chain->set_ws_stable_mci_func(
+				std::bind(&mcp::rpc_ws::on_stable_mci, rpc_ws, std::placeholders::_1)
+			);
+		}
+		else
+		{
+			LOG(m_log.info) << "WebSocket RPC is disabled";
+		}
 
 		ongoing_report(chain_store, host, sync_async, background, cache,
 			sync, processor, capability,chain, alarm, TQ, AQ, witness, m_log);

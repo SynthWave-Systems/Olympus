@@ -1,4 +1,5 @@
 #include "rpc_ws.hpp"
+#include "handler.hpp"
 
 mcp::rpc_ws_config::rpc_ws_config() :
 	address(boost::asio::ip::address_v4::loopback()),
@@ -303,11 +304,12 @@ bool mcp::subscribe::index_is_exist(int indexno)
 
 
 /*socket*/
-mcp::rpc_ws::rpc_ws(boost::asio::io_service & service_a, std::shared_ptr<mcp::async_task> background_a, mcp::rpc_ws_config const & config_a) :
+mcp::rpc_ws::rpc_ws(boost::asio::io_service & service_a, std::shared_ptr<mcp::async_task> background_a, mcp::rpc_ws_config const & config_a, mcp::rpc & rpc_a) :
 	acceptor(service_a),
 	background(background_a),
 	sock(service_a),
-	config(config_a)
+	config(config_a),
+	rpc(rpc_a)
 {
 }
 
@@ -412,13 +414,32 @@ void mcp::rpc_ws::trigger_subscribe(std::string message, mcp::json & pdata)
 
 void mcp::rpc_ws::close_ws(mcp::rpc_ws_connection & conn)
 {
-	subscribe.close_websocket(conn);
+        subscribe.close_websocket(conn);
+}
+
+void mcp::rpc_ws::dispatch_jsonrpc(std::shared_ptr<mcp::rpc_ws_connection> connection, std::string body)
+{
+        auto self(shared_from_this());
+        auto weak_connection = std::weak_ptr<mcp::rpc_ws_connection>(connection);
+        background->sync_async([self, weak_connection, body = std::move(body)]() mutable
+        {
+                auto response_handler = [weak_connection](mcp::json const & js)
+                {
+                        if (auto connection_l = weak_connection.lock())
+                        {
+                                connection_l->do_send(js.dump());
+                        }
+                };
+
+                auto handler = std::make_shared<mcp::rpc_handler>(self->rpc, body, response_handler);
+                handler->process_request();
+        });
 }
 
 /*deal websocket connection */
 mcp::rpc_ws_connection::rpc_ws_connection(bi::tcp::socket sock, mcp::rpc_ws & rpc_ws_a) :
-	ws(boost::asio::make_strand(sock.get_executor())),
-	rpc_ws(rpc_ws_a)
+        ws(boost::asio::make_strand(sock.get_executor())),
+        rpc_ws(rpc_ws_a)
 {
 
 }
@@ -525,8 +546,16 @@ void mcp::rpc_ws_connection::on_write(
 
 void mcp::rpc_ws_connection::do_send(std::string res)
 {
-	if(ws.is_open())
-		ws.write(boost::asio::buffer(std::string(res)));
+	auto self(shared_from_this());
+	boost::asio::post(ws.get_executor(), [self, res = std::move(res)]() mutable
+	{
+		if (!self->ws.is_open())
+			return;
+		boost::system::error_code ec;
+		self->ws.write(boost::asio::buffer(res), ec);
+		if (ec)
+			LOG(self->m_log.error) << boost::str(boost::format("Error write data WebSocket RPC connections: %1%") % ec);
+	});
 }
 
 mcp::rpc_ws_handler::rpc_ws_handler(mcp::rpc_ws & rpc_ws_a, mcp::rpc_ws_connection & rpc_ws_connection_a, std::string body_a) :
@@ -539,12 +568,39 @@ mcp::rpc_ws_handler::rpc_ws_handler(mcp::rpc_ws & rpc_ws_a, mcp::rpc_ws_connecti
 
 void mcp::rpc_ws_handler::process_request()
 {
+        auto self(shared_from_this());
+        auto connection = rpc_ws_connection.shared_from_this();
+        auto handle_jsonrpc = [self, connection]() mutable
+        {
+                self->rpc_ws.dispatch_jsonrpc(connection, std::move(self->body));
+        };
+
+        try
+        {
+                request_json = mcp::json::parse(body);
+        }
+	catch (...)
+	{
+		handle_jsonrpc();
+		return;
+	}
+
+        if (!request_json.is_object())
+        {
+                handle_jsonrpc();
+                return;
+        }
+
+        auto action_it = request_json.find("action");
+        if (action_it == request_json.end() || !action_it->is_string())
+        {
+                handle_jsonrpc();
+                return;
+        }
+
 	try
 	{
-		request_json = mcp::json::parse(body);
-		std::string action = request_json["action"];
-
-		bool handled = false;
+		std::string action = action_it->get<std::string>();
 		if (action == "subscribe")
 		{
 			subscribe();
@@ -562,7 +618,7 @@ void mcp::rpc_ws_handler::process_request()
 			deal_error(rpc_ws_error::action_not_exist);
 		}
 	}
-	catch (std::exception const & err)
+	catch (std::exception const &)
 	{
 		deal_error(rpc_ws_error::unable_parse_JSON);
 	}
@@ -685,10 +741,11 @@ void mcp::rpc_ws_handler::unsubscribe()
 std::shared_ptr<mcp::rpc_ws> mcp::get_rpc_ws(
 	boost::asio::io_service & service_a, 
 	std::shared_ptr<mcp::async_task> background_a, 
-	mcp::rpc_ws_config const & config_a
+	mcp::rpc_ws_config const & config_a, 
+	mcp::rpc & rpc_a
 )
 {
-	std::shared_ptr<rpc_ws> impl(new rpc_ws(service_a, background_a, config_a));
+	std::shared_ptr<rpc_ws> impl(new rpc_ws(service_a, background_a, config_a, rpc_a));
 	return impl;
 }
 
