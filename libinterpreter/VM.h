@@ -68,6 +68,18 @@ public:
     void setOpcodeLogCallback(const OpcodeLogCallback& callback) { m_opcodeLogCallback = callback; }
 
     uint64_t m_io_gas = 0;
+
+    /// Return the gas cost of the current opcode.
+    uint64_t currentGasCost() const { return m_runGas; }
+
+    /// Return the remaining gas as observed by the interpreter.
+    uint64_t gasLeft() const { return m_io_gas; }
+
+    /// Expose a copy of the current stack represented as intx::uint256 values.
+    std::vector<intx::uint256> stackIntx() const;
+
+    /// Provide read-only access to the interpreter memory buffer.
+    bytes const& memory() const { return m_mem; }
 private:
     const evmc_host_interface* m_host = nullptr;
     evmc_host_context* m_context = nullptr;

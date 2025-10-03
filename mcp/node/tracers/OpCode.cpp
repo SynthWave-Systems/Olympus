@@ -1,19 +1,32 @@
 #include "OpCode.hpp"
 #include <libevm/LegacyVM.h>
+#include <libinterpreter/VM.h>
 #include <mcp/node/evm/ExtVM.h>
 
 using namespace dev::eth;
 void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
-	uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
+        uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
-	// check if already accumulated the specified number of logs
-	if (m_options.limit != 0 && m_options.limit <= m_outValue.size())
-		return;
+        auto const& options = debugOptions();
 
-	ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
-	auto vm = dynamic_cast<LegacyVM const*>(_vm);
+        // check if already accumulated the specified number of logs
+        if (options.limit != 0 && options.limit <= m_outValue.size())
+                return;
 
-	mcp::json r = mcp::json::object();
+        ExtVM const& ext = dynamic_cast<ExtVM const&>(*voidExt);
+        auto vmLegacy = dynamic_cast<LegacyVM const*>(_vm);
+        u256s stackData;
+        if (vmLegacy)
+                stackData = vmLegacy->stack();
+        else if (auto interpreter = currentVM())
+        {
+                auto stackIntx = interpreter->stackIntx();
+                stackData.reserve(stackIntx.size());
+                for (auto const& word : stackIntx)
+                        stackData.emplace_back(intxToU256(word));
+        }
+
+        mcp::json r = mcp::json::object();
 
 	r["pc"] = PC;
 	r["op"] = instructionInfo(inst).name;
@@ -26,19 +39,19 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	//if (!!newMemSize)
 	//	r["memexpand"] = toString(newMemSize);
 
-	mcp::json stack = mcp::json::array();
-	if (vm && !m_options.disableStack)
-	{
-		//mcp::log m_log = { mcp::log("vm") };
-		// Try extracting information about the stack from the VM is supported.
-		for (auto const& i : vm->stack())
-		{
-			//LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
-			stack.push_back(toCompactHexPrefixedTrim(i));
-		}
+        mcp::json stack = mcp::json::array();
+        if (!options.disableStack && (vmLegacy || currentVM()))
+        {
+                //mcp::log m_log = { mcp::log("vm") };
+                // Try extracting information about the stack from the VM is supported.
+                for (auto const& i : stackData)
+                {
+                        //LOG(m_log.info) << i << " : " << toCompactHexPrefixed(i, 1);
+                        stack.push_back(toCompactHexPrefixedTrim(i));
+                }
 
-		r["stack"] = stack;
-	}
+                r["stack"] = stack;
+        }
 
 	//bool newContext = false;
 	//Instruction lastInst = Instruction::STOP;
@@ -69,26 +82,26 @@ void mcp::OpCode::CaptureState(uint64_t PC, dev::eth::Instruction inst,
 	//	m_lastInst.resize(ext.depth + 1);
 	//}
 
-	if (vm)
-	{
-		bytes const& memory = vm->memory();
+        if (vmLegacy || currentVM())
+        {
+                bytes const& memory = vmLegacy ? vmLegacy->memory() : currentVM()->memory();
 
-		mcp::json memJson(mcp::json::array());
-		if (m_options.enableMemory)
-		{
-			for (unsigned i = 0; i < memory.size(); i += 32)
-			{
-				bytesConstRef memRef(memory.data() + i, 32);
-				memJson.push_back(toHex(memRef));
-			}
-			r["memory"] = memJson;
-		}
-		//r["memSize"] = static_cast<uint64_t>(memory.size());
-	}
+                mcp::json memJson(mcp::json::array());
+                if (options.enableMemory)
+                {
+                        for (unsigned i = 0; i < memory.size(); i += 32)
+                        {
+                                bytesConstRef memRef(memory.data() + i, 32);
+                                memJson.push_back(toHex(memRef));
+                        }
+                        r["memory"] = memJson;
+                }
+                r["memSize"] = static_cast<uint64_t>(memory.size());
+        }
 
-	if (!m_options.disableStorage &&
-		(inst == Instruction::SLOAD || inst == Instruction::SSTORE)
-		/*(m_options.fullStorage || changesStorage(lastInst) || newContext)*/)
+        if (!options.disableStorage &&
+                (inst == Instruction::SLOAD || inst == Instruction::SSTORE)
+                /*(m_options.fullStorage || changesStorage(lastInst) || newContext)*/)
 	{
 		mcp::json storage(mcp::json::object());
 		for (auto const& i : ext.state().storage(ext.myAddress))
@@ -108,24 +121,4 @@ mcp::json mcp::OpCode::GetResult()
 	ret["returnValue"] = toHex(m_res->output);
 	ret["structLogs"] = m_outValue;
 	return ret;
-}
-
-mcp::OpCode::DebugOptions mcp::OpCode::debugOptions(mcp::json const& _json)
-{
-	mcp::OpCode::DebugOptions op;
-	if (!_json.is_object() || _json.empty())
-		return op;
-	if (_json.count("enableMemory") && !_json["enableMemory"].empty())
-		op.enableMemory = _json["enableMemory"].get<bool>();
-	if (_json.count("disableStorage") && !_json["disableStorage"].empty())
-		op.disableStorage = _json["disableStorage"].get<bool>();
-	if (_json.count("disableStack") && !_json["disableStack"].empty())
-		op.disableStack = _json["disableStack"].get<bool>();
-	//if (_json.count("full_storage") && !_json["full_storage"].empty())
-	//	op.fullStorage = _json["full_storage"].get<bool>();
-	if (_json.count("debug") && !_json["debug"].empty())
-		op.debug = _json["debug"].get<bool>();
-	if (_json.count("limit") && !_json["limit"].empty())
-		op.limit = _json["limit"].get<int>();
-	return op;
 }
