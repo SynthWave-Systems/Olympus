@@ -1,5 +1,6 @@
 #include "PreState.hpp"
 #include <libevm/LegacyVM.h>
+#include <libinterpreter/VM.h>
 #include <libdevcore/CommonJS.h>
 //#include <mcp/node/evm/ExtVM.h>
 
@@ -118,8 +119,19 @@ void mcp::PreStateTracer::CaptureEnd(dev::bytes const& _output, uint64_t _gasUse
 
 void mcp::PreStateTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint64_t gasCost, uint64_t gas, dev::eth::VMFace const* _vm, dev::eth::ExtVMFace const* voidExt)
 {
-    auto vm = dynamic_cast<LegacyVM const*>(_vm);
-    u256s stackData = vm->stack();
+    auto vmLegacy = dynamic_cast<LegacyVM const*>(_vm);
+    u256s stackData;
+    if (vmLegacy)
+        stackData = vmLegacy->stack();
+    else if (auto interpreter = currentVM())
+    {
+        auto stackIntx = interpreter->stackIntx();
+        stackData.reserve(stackIntx.size());
+        for (auto const& word : stackIntx)
+            stackData.emplace_back(intxToU256(word));
+    }
+    else
+        return;
     auto stackLen = stackData.size();
     auto caller = voidExt->myAddress;
 
@@ -156,7 +168,7 @@ void mcp::PreStateTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, 
     {
         int64_t offset = stackData[stackLen - 2].convert_to<int64_t>();
         int64_t size = stackData[stackLen - 3].convert_to<int64_t>();
-        bytes const& memory = vm->memory();
+        bytes const& memory = vmLegacy ? vmLegacy->memory() : currentVM()->memory();
         bytesConstRef init = bytesConstRef(memory.data() + offset, size);
         h256 salt = stackData[stackLen - 4];
         dev::Address addr = right160(sha3(bytes{ 0xff } + caller.asBytes() + toBigEndian(salt) + sha3(init)));

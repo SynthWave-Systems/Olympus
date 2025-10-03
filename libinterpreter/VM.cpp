@@ -3,6 +3,7 @@
 // Licensed under the GNU General Public License, Version 3.
 #include "interpreter.h"
 #include "VM.h"
+#include <algorithm>
 
 //#include <aleth/version.h>
 
@@ -124,6 +125,15 @@ namespace eth
 
 // Global opcode logging callback
 OpcodeLogCallback g_opcodeLogCallback;
+std::vector<intx::uint256> VM::stackIntx() const
+{
+    std::vector<intx::uint256> out;
+    out.reserve(m_stackEnd - m_SP);
+    for (auto it = m_SP; it != m_stackEnd; ++it)
+        out.emplace_back(*it);
+    std::reverse(out.begin(), out.end());
+    return out;
+}
 uint64_t VM::memNeed(intx::uint256 const& _offset, intx::uint256 const& _size)
 {
     return toInt63(_size ? intx::uint512(_offset) + _size : intx::uint512(0));

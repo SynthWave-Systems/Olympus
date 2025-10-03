@@ -1,5 +1,6 @@
 #include "Call.hpp"
 #include <libevm/LegacyVM.h>
+#include <libinterpreter/VM.h>
 #include <mcp/node/evm/ExtVM.h>
 #include <libdevcore/CommonJS.h>
 #include <account/abi.hpp>
@@ -105,9 +106,20 @@ void mcp::CallTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint
         inst != Instruction::LOG4)
         return;
 
-    auto vm = dynamic_cast<LegacyVM const*>(_vm);
+    auto vmLegacy = dynamic_cast<LegacyVM const*>(_vm);
     int size = (uint8_t)inst - (uint8_t)Instruction::LOG0;
-    u256s stackData = vm->stack();
+    u256s stackData;
+    if (vmLegacy)
+        stackData = vmLegacy->stack();
+    else if (auto interpreter = currentVM())
+    {
+        auto stackIntx = interpreter->stackIntx();
+        stackData.reserve(stackIntx.size());
+        for (auto const& word : stackIntx)
+            stackData.emplace_back(intxToU256(word));
+    }
+    else
+        return;
     int64_t mStart = stackData[stackData.size() - 1].convert_to<int64_t>();
     int64_t mSize = stackData[stackData.size() - 2].convert_to<int64_t>();
 
@@ -122,7 +134,7 @@ void mcp::CallTracer::CaptureState(uint64_t PC, dev::eth::Instruction inst, uint
         return;
 
     bytesConstRef _data;
-    bytes const& memory = vm->memory();
+    bytes const& memory = vmLegacy ? vmLegacy->memory() : currentVM()->memory();
     if (mStart + mSize < memory.size())// slice fully inside memory
         _data = bytesConstRef(memory.data() + mStart, mSize);
     else
