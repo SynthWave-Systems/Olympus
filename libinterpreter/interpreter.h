@@ -1,5 +1,6 @@
 // Aleth: Ethereum C++ client, tools and libraries.
 // Copyright 2018-2019 Aleth Authors.
+// Copyright 2024-2025 The Olympus Developers.
 // Licensed under the GNU General Public License, Version 3.
 #pragma once
 

@@ -17,7 +17,9 @@ namespace bi = boost::asio::ip;
 
 namespace mcp
 {
-	enum class rpc_ws_error
+        class rpc;
+
+        enum class rpc_ws_error
 	{
 		success = 0,
 		action_not_exist = 1,
@@ -79,7 +81,7 @@ namespace mcp
 	class rpc_ws : public std::enable_shared_from_this<rpc_ws>
 	{
 	public:
-		rpc_ws(boost::asio::io_service & service_a, std::shared_ptr<mcp::async_task> background_a, mcp::rpc_ws_config const & config_a);
+		rpc_ws(boost::asio::io_service & service_a, std::shared_ptr<mcp::async_task> background_a, mcp::rpc_ws_config const & config_a, mcp::rpc & rpc_a);
 
 		void start();
 
@@ -93,14 +95,18 @@ namespace mcp
 
 		void trigger_subscribe(std::string message, mcp::json & pdata);
 
-		void close_ws(mcp::rpc_ws_connection & conn);
+                void close_ws(mcp::rpc_ws_connection & conn);
 
-		static uint16_t const rpc_ws_port = 8764;
+                static uint16_t const rpc_ws_port = 8764;
 
-		//register to chain
-		void on_new_block(std::shared_ptr<mcp::block> block);
-		void on_stable_block(std::shared_ptr<mcp::block> block);
-		void on_stable_mci(uint64_t const & stable_mci);
+                mcp::rpc & rpc_instance() { return m_rpc; }
+
+                void dispatch_jsonrpc(std::shared_ptr<mcp::rpc_ws_connection> connection, std::string body);
+
+                //register to chain
+                void on_new_block(std::shared_ptr<mcp::block> block);
+                void on_stable_block(std::shared_ptr<mcp::block> block);
+                void on_stable_mci(uint64_t const & stable_mci);
 	private:
 		virtual void accept();
 
@@ -111,7 +117,8 @@ namespace mcp
 		bi::tcp::socket sock;
 		mcp::rpc_ws_config config;
 		mcp::subscribe subscribe;	/*subscribe message*/
-        mcp::log m_log = { mcp::log("rpc") };
+		mcp::rpc & m_rpc;
+		mcp::log m_log = { mcp::log("rpc") };
 	};
 
 	class rpc_ws_connection : public std::enable_shared_from_this<rpc_ws_connection>
@@ -171,7 +178,8 @@ namespace mcp
 std::shared_ptr<mcp::rpc_ws> get_rpc_ws(
 	boost::asio::io_service & service_a, 
 	std::shared_ptr<mcp::async_task> background_a, 
-	mcp::rpc_ws_config const & config_a
+	mcp::rpc_ws_config const & config_a, 
+	mcp::rpc & rpc_a
 );
 
 }

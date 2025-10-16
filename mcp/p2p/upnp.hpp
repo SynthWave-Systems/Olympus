@@ -20,7 +20,7 @@ namespace mcp
 
 			~upnp();
 
-			bool isValid() const { return m_ok; }
+			bool isValid() const noexcept { return m_ok; }
 
 			static std::set<bi::address> getInterfaceAddresses();
 

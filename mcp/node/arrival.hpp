@@ -17,11 +17,12 @@ namespace mcp
 		std::chrono::steady_clock::time_point arrival;
 		mcp::block_hash hash;
 	};
+
 	class block_arrival
 	{
 	public:
 		void add(mcp::block_hash const &);
-		void remove(mcp::block_hash const & hash_a);
+		void remove_block(mcp::block_hash const & hash_a);
 		bool recent(mcp::block_hash const & hash_a);
 		boost::multi_index_container<
 			mcp::block_arrival_info,

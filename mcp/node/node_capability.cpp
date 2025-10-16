@@ -43,7 +43,7 @@ void mcp::node_capability::stop()
 
 void mcp::node_capability::on_connect(std::shared_ptr<p2p::peer> peer_a, unsigned const & offset)
 {
-    auto  node_id = peer_a->remote_node_id();
+    auto node_id = peer_a->remote_node_id();
     if (m_genesis == mcp::block_hash(0))
     {
         mcp::db::db_transaction transaction(m_store.create_transaction());
@@ -554,7 +554,7 @@ bool mcp::node_capability::read_packet(std::shared_ptr<p2p::peer> peer_a, unsign
 						mcp::db::db_transaction transaction(m_store.create_transaction());
 						if (!m_cache->block_exists(transaction, *hash))
 						{
-							BlockArrival.remove(*hash);
+							BlockArrival.remove_block(*hash);
 							uint64_t _time = SteadyClock.now_since_epoch();
 							mcp::requesting_item item(peer_a->remote_node_id(), *hash, mcp::requesting_block_cause::request_peer_info, _time);
 							m_sync->request_new_missing_joints(item);

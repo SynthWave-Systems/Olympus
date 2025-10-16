@@ -6,6 +6,7 @@
 
 namespace mcp
 {
+	// read-only "mostly" client interface to the blockchain
 	class Client
 	{
 	public:
@@ -75,6 +76,7 @@ namespace mcp
 		int storeVersion();
 	private:
 		bool getMcInfo(dev::eth::McInfo& mc_info_a, uint64_t& block_number);
+		dev::eth::McInfo& getMcInf(dev::eth::McInfo& mc_info_a, BlockNumber _blockNumber);
 		/// InterfaceStub methods
 		chain& bc() { return *m_chain; }
 		chain const& bc() const { return *m_chain; }

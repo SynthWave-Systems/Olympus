@@ -23,10 +23,10 @@ namespace mcp
 		std::vector< std::shared_ptr<Transaction> > transactions;	///< Verified list of block transactions
 	};
 
-	class TransactionReceiptPlaceholder :public dev::eth::TransactionReceipt
+	class TransactionReceiptPlaceholder : public dev::eth::TransactionReceipt
 	{
 	public:
-		TransactionReceiptPlaceholder():TransactionReceipt(0,0, mcp::log_entries()){m_Placeholder = true;}
+		TransactionReceiptPlaceholder()	:	TransactionReceipt(0,0, mcp::log_entries()){m_Placeholder = true;}
 	};
 
 	class chain;

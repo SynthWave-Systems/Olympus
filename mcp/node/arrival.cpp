@@ -7,7 +7,7 @@ void mcp::block_arrival::add(mcp::block_hash const & hash_a)
 	arrival.insert(mcp::block_arrival_info{ now, hash_a });
 }
 
-void mcp::block_arrival::remove(mcp::block_hash const & hash_a)
+void mcp::block_arrival::remove_block(mcp::block_hash const & hash_a)
 {
 	std::lock_guard<std::mutex> lock(mutex);
 	arrival.get<1>().erase(hash_a);

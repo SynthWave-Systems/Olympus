@@ -18,6 +18,7 @@ namespace mcp
 namespace mcp_daemon
 {
     void add_options(boost::program_options::options_description &);
+	
 	void ongoing_report(
 		mcp::block_store& store, std::shared_ptr<mcp::p2p::host> host,
 		std::shared_ptr<mcp::async_task> sync_async, std::shared_ptr<mcp::async_task> background,

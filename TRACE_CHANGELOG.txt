@@ -1,0 +1,30 @@
+Tracing Refactor Summary (2025-10-16)
+=====================================
+
+**Tracing Core**
+- mcp/node/tracers/Tracer.hpp / .cpp
+  - Added a virtual destructor (`~Tracer()`) to restore RTTI linkage.
+  - Exposed `DebugOptions` publicly so every tracer can reuse the configuration helpers.
+  - Kept the base tracer name neutral (`GetTracerName()` now returns an empty string).
+
+**Call Tracer**
+- mcp/node/tracers/CallTracer.hpp / .cpp
+  - Rebuilt call-frame management: reset state on `CaptureStart`, maintain the stack, capture gas/input/output via shared helpers, and guard empty results.
+  - Added light documentation describing the tracer’s purpose and fields.
+
+**4-Byte Tracer**
+- mcp/node/tracers/4ByteTracer.hpp / .cpp
+  - Simplified to record selectors for every `CALL`/`CALLCODE`/`DELEGATECALL`/`STATICCALL`, skipping contract creation and precompiles.
+  - Renamed helpers (`recordCallSelector`, `isCallInstruction`) and removed depth/debug bookkeeping.
+
+**Utility Helpers**
+- libdevcore/CommonJS.cpp
+  - Centralized `toHexBytes` and `toHexQuantity` definitions to eliminate multiple-definition link errors.
+
+**Factory Wiring**
+- mcp/node/tracers/Tracer.cpp
+  - Updated `NewTracer` to instantiate the revamped tracers (opcode, call, 4byte) consistently.
+
+**Regression Test**
+- test/rpc_test/test_tracers.py
+  - Added a `requests`-based smoke test that probes `debug_traceTransaction` with each tracer, choosing a transaction hash from environment variables or `calls.txt`.

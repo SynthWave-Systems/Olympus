@@ -595,6 +595,11 @@ int mcp::Client::storeVersion()
 	return m_store.version_get();
 }
 
+dev::eth::McInfo& getMcInf(dev::eth::McInfo& mc_info_a, BlockNumber _blockNumber) {
+	//BOOST_LOG(m_log.debug) << "getMcInf: " << _blockNumber;
+	return mc_info_a; 
+}
+
 bool mcp::Client::getMcInfo(dev::eth::McInfo& mc_info_a, uint64_t& block_number)
 {
 	uint64_t _bn = block_number;

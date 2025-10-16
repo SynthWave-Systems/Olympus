@@ -303,11 +303,12 @@ bool mcp::subscribe::index_is_exist(int indexno)
 
 
 /*socket*/
-mcp::rpc_ws::rpc_ws(boost::asio::io_service & service_a, std::shared_ptr<mcp::async_task> background_a, mcp::rpc_ws_config const & config_a) :
+mcp::rpc_ws::rpc_ws(boost::asio::io_service & service_a, std::shared_ptr<mcp::async_task> background_a, mcp::rpc_ws_config const & config_a, mcp::rpc & rpc_a) :
 	acceptor(service_a),
 	background(background_a),
 	sock(service_a),
-	config(config_a)
+	config(config_a),
+	m_rpc(rpc_a)
 {
 }
 
@@ -685,10 +686,11 @@ void mcp::rpc_ws_handler::unsubscribe()
 std::shared_ptr<mcp::rpc_ws> mcp::get_rpc_ws(
 	boost::asio::io_service & service_a, 
 	std::shared_ptr<mcp::async_task> background_a, 
-	mcp::rpc_ws_config const & config_a
+	mcp::rpc_ws_config const & config_a,
+	mcp::rpc & rpc_a
 )
 {
-	std::shared_ptr<rpc_ws> impl(new rpc_ws(service_a, background_a, config_a));
+	std::shared_ptr<rpc_ws> impl(new rpc_ws(service_a, background_a, config_a, rpc_a));
 	return impl;
 }
 
