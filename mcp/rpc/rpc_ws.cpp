@@ -634,7 +634,7 @@ void mcp::rpc_ws_handler::subscribe()
 	{
 		int num = 0;
 		rpc_ws_error ret;
-		for (auto mes : messages)
+		for (auto const& mes : messages)
 		{
 			std::string message = mes.get<std::string>();
 			ret = rpc_ws.subscription(message, rpc_ws_connection);
@@ -664,7 +664,7 @@ void mcp::rpc_ws_handler::unsubscribe()
 	{
 		int num = 0;
 		rpc_ws_error ret;
-		for (auto mes : messages)
+		for (auto const& mes : messages)
 		{
 			std::string message = mes.get<std::string>();
 			ret = rpc_ws.unsubscription(message, rpc_ws_connection);

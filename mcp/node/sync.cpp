@@ -2,6 +2,7 @@
 #include "requesting.hpp"
 #include <libdevcore/TrieHash.h>
 #include <mcp/core/param.hpp>
+#include <sstream>
 
 mcp::sync_request_status::sync_request_status(mcp::p2p::node_id const & request_node_id_a,
 	mcp::sub_packet_type const & request_type_a) :
@@ -2102,11 +2103,12 @@ void mcp::node_sync::send_peer_info(p2p::node_id const & id, mcp::peer_info_mess
 
 std::string mcp::node_sync::get_sync_info()
 {
-	std::string str = "unstable_mc_joints:" + std::to_string(m_request_info.unstable_mc_joints.size());
-	str = str + ", catchup_del_index:" + std::to_string(m_request_info.catchup_del_index.size());
-	str = str + ", catchup to summary size:" + std::to_string(m_request_info.to_summary_index.size());
-	str = str + ", m_joint_request_pending size:" + std::to_string(m_joint_request_pending.size());
-	//str = str + ", del_hash_tree_summaries size:" + std::to_string(m_to_del_hash_tree_summaries.size());
-	return str;
+	std::ostringstream str;
+	str << "unstable_mc_joints:" << m_request_info.unstable_mc_joints.size()
+		<< ", catchup_del_index:" << m_request_info.catchup_del_index.size()
+		<< ", catchup to summary size:" << m_request_info.to_summary_index.size()
+		<< ", m_joint_request_pending size:" << m_joint_request_pending.size();
+	//str << ", del_hash_tree_summaries size:" << m_to_del_hash_tree_summaries.size();
+	return str.str();
 }
 

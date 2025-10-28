@@ -1,4 +1,5 @@
 #include "requesting.hpp"
+#include <sstream>
 
 namespace mcp 
 {
@@ -96,18 +97,18 @@ std::list<mcp::requesting_item> mcp::requesting_mageger::clear_by_time(uint64_t 
 
 std::string mcp::requesting_mageger::get_info()
 {
-	std::string ret = "size:" + std::to_string(size())
-		+ " ,joint new_unknown:" + std::to_string(counts[sub_packet_type::joint_request][requesting_block_cause::new_unknown])
-		+ " ,joint existing_unknown:" + std::to_string(counts[sub_packet_type::joint_request][requesting_block_cause::existing_unknown])
-		+ " ,joint peer_info:" + std::to_string(counts[sub_packet_type::joint_request][requesting_block_cause::request_peer_info])
-		+ " ,transaction new_unknown:" + std::to_string(counts[sub_packet_type::transaction_request][requesting_block_cause::new_unknown])
-		+ " ,transaction existing_unknown:" + std::to_string(counts[sub_packet_type::transaction_request][requesting_block_cause::existing_unknown])
-		+ " ,transaction peer_info:" + std::to_string(counts[sub_packet_type::transaction_request][requesting_block_cause::request_peer_info])
-		+ " ,approve new_unknown:" + std::to_string(counts[sub_packet_type::approve_request][requesting_block_cause::new_unknown])
-		+ " ,approve existing_unknown:" + std::to_string(counts[sub_packet_type::approve_request][requesting_block_cause::existing_unknown])
-		+ " ,approve peer_info:" + std::to_string(counts[sub_packet_type::approve_request][requesting_block_cause::request_peer_info])
-		;
-	return ret;
+	std::ostringstream ret;
+	ret << "size:" << size()
+		<< " ,joint new_unknown:" << counts[sub_packet_type::joint_request][requesting_block_cause::new_unknown]
+		<< " ,joint existing_unknown:" << counts[sub_packet_type::joint_request][requesting_block_cause::existing_unknown]
+		<< " ,joint peer_info:" << counts[sub_packet_type::joint_request][requesting_block_cause::request_peer_info]
+		<< " ,transaction new_unknown:" << counts[sub_packet_type::transaction_request][requesting_block_cause::new_unknown]
+		<< " ,transaction existing_unknown:" << counts[sub_packet_type::transaction_request][requesting_block_cause::existing_unknown]
+		<< " ,transaction peer_info:" << counts[sub_packet_type::transaction_request][requesting_block_cause::request_peer_info]
+		<< " ,approve new_unknown:" << counts[sub_packet_type::approve_request][requesting_block_cause::new_unknown]
+		<< " ,approve existing_unknown:" << counts[sub_packet_type::approve_request][requesting_block_cause::existing_unknown]
+		<< " ,approve peer_info:" << counts[sub_packet_type::approve_request][requesting_block_cause::request_peer_info];
+	return ret.str();
 }
 
 
