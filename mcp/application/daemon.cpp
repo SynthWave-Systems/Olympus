@@ -885,7 +885,7 @@ void mcp_daemon::ongoing_report(
 )
 {
 	auto map_peers_metrics = host->get_peers_metrics();
-	for (auto i : map_peers_metrics)
+	for (auto const& i : map_peers_metrics)
 	{
 		auto p = i.second;
 		if (p->write_write_queue_size > 0
@@ -995,7 +995,7 @@ void mcp_daemon::ongoing_report(
 	count++;
 
 	auto elapseds = mcp::stopwatch_manager::list_elapseds();
-	for (auto p : elapseds)
+	for (auto const& p : elapseds)
 	{
 		LOG(log.info) << p.first << ":" << p.second.count() / 1000 << "s";
 	}

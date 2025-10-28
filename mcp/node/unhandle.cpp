@@ -1,6 +1,7 @@
 #include "unhandle.hpp"
 #include "arrival.hpp"
 #include <queue>
+#include <sstream>
 
 constexpr size_t c_maxBlockPendingSize = 1000;
 
@@ -330,16 +331,16 @@ bool mcp::unhandle_cache::is_full()
 
 std::string mcp::unhandle_cache::getInfo()
 {
-	std::string str = "pending size:" + std::to_string(m_pending.size())
-		+ " ,dependency size:" + std::to_string(m_dependencies.size())
-		+ " ,missing size:" + std::to_string(m_missings.size())
-		+ " ,txs :" + std::to_string(m_light_missings.size())
-		+ " ,apx :" + std::to_string(m_approve_missings.size())
-		+ " ,ok:" + std::to_string(add_unhandle_ok_count)
-		+ " ,full:" + std::to_string(unhandle_full_count)
-		+ " ,exist:" + std::to_string(unhandle_exist_count)
-		;
+	std::ostringstream str;
+	str << "pending size:" << m_pending.size()
+		<< " ,dependency size:" << m_dependencies.size()
+		<< " ,missing size:" << m_missings.size()
+		<< " ,txs :" << m_light_missings.size()
+		<< " ,apx :" << m_approve_missings.size()
+		<< " ,ok:" << add_unhandle_ok_count
+		<< " ,full:" << unhandle_full_count
+		<< " ,exist:" << unhandle_exist_count;
 
-	return str;
+	return str.str();
 }
 

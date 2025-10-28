@@ -2,6 +2,7 @@
 #include <mcp/core/genesis.hpp>
 #include <mcp/core/param.hpp>
 #include <mcp/consensus/ledger.hpp>
+#include <sstream>
 
 mcp::witness::witness(mcp::error_message & error_msg,
 	std::shared_ptr<mcp::key_manager> key_manager_a,
@@ -278,15 +279,16 @@ void mcp::witness::try_create_approve(uint64_t const& mci)
 
 std::string mcp::witness::getInfo()
 {
-	std::string str = "lessInterval:" + std::to_string(witness_interval_count)
-		+ " ,syncing:" + std::to_string(witness_syncing_count)
-		+ " ,noTransaction:" + std::to_string(witness_transaction_count)
-		+ " ,notWitness:" + std::to_string(witness_notwitness_count)
-		+ " ,majority:" + std::to_string(witness_majority_count)
-		+ " ,approveSuccessed:" + std::to_string(approve_success_count)
-		+ " ,approveFailed:" + std::to_string(approve_failed_count);
+	std::ostringstream str;
+	str << "lessInterval:" << witness_interval_count
+		<< " ,syncing:" << witness_syncing_count
+		<< " ,noTransaction:" << witness_transaction_count
+		<< " ,notWitness:" << witness_notwitness_count
+		<< " ,majority:" << witness_majority_count
+		<< " ,approveSuccessed:" << approve_success_count
+		<< " ,approveFailed:" << approve_failed_count;
 
-	return str;
+	return str.str();
 }
 
 std::atomic_flag mcp::witness::m_is_witnessing = ATOMIC_FLAG_INIT;

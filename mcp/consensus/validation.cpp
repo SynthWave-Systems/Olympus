@@ -190,7 +190,7 @@ mcp::validate_result mcp::validation::dag_validate(mcp::db::db_transaction & tra
 	auto links(block->links());
 	Address previousFrom(0);
 	u256 accNonce = 0;
-	for (auto link : links)
+	for (auto const& link : links)
 	{
 		auto t = m_tq->get(link);
 		if (nullptr == t)
@@ -237,7 +237,7 @@ mcp::validate_result mcp::validation::dag_validate(mcp::db::db_transaction & tra
 	/// check approves
 	/// approves must in cache or processed. if not, the block lack the necessary conditions for processing.
 	auto approves(block->approves());
-	for (auto approve : approves)
+	for (auto const& approve : approves)
 	{
 		auto t = m_aq->get(approve);
 		if (nullptr == t)

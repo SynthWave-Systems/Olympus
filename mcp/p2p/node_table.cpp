@@ -313,7 +313,7 @@ void node_table::handle_receive(bi::udp::endpoint const & from, dev::bytesConstR
 				break;
 			}
 
-			for (auto n : in.neighbours)
+			for (auto const& n : in.neighbours)
 			{
 				add_node(node_info(n.id, n.endpoint));
 			}

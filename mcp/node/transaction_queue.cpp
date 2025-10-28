@@ -1,5 +1,6 @@
 #include "transaction_queue.hpp"
 #include <thread>
+#include <sstream>
 
 namespace mcp
 {
@@ -577,17 +578,17 @@ namespace mcp
 			}
 		}
 
-		std::string str = "transactionQueue all txs:" + std::to_string(allSize)
-			+ " ,queue  account:" + std::to_string(queueAccountSize)
-			+ " ,pending account:" + std::to_string(pendingAccountSize)
-			+ " ,queue txs:" + std::to_string(queueSize)
-			+ " ,pending txs:" + std::to_string(pendingSize)
-			+ " ,m_known:" + std::to_string(knownSize)
-			+ " ,m_dropped:" + std::to_string(dropSize)
-			+ " ,m_pendingSize:" + std::to_string(m_pendingSize)
-			;
+		std::ostringstream str;
+		str << "transactionQueue all txs:" << allSize
+			<< " ,queue  account:" << queueAccountSize
+			<< " ,pending account:" << pendingAccountSize
+			<< " ,queue txs:" << queueSize
+			<< " ,pending txs:" << pendingSize
+			<< " ,m_known:" << knownSize
+			<< " ,m_dropped:" << dropSize
+			<< " ,m_pendingSize:" << m_pendingSize;
 
-		return str;
+		return str.str();
 	}
 
 	void TransactionQueue::prinf()

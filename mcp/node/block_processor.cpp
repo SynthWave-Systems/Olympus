@@ -3,6 +3,7 @@
 #include <mcp/common/stopwatch.hpp>
 #include <mcp/core/genesis.hpp>
 #include <libdevcore/CommonJS.h>
+#include <sstream>
 
 constexpr uint32_t tx_timeout_ms = 1000;
 constexpr unsigned max_mt_count = 16;
@@ -924,19 +925,19 @@ void mcp::block_processor::after_db_commit_event()
 
 std::string mcp::block_processor::get_processor_info()
 {
-	std::string str = "m_blocks_pending:" + std::to_string(m_blocks_pending.size())
-		+ " ,m_local_blocks_pending:" + std::to_string(m_local_blocks_pending.size())
-		+ " ,m_mt_blocks_pending:" + std::to_string(m_mt_blocks_pending.size())
-		+ " ,m_mt_blocks_processing:" + std::to_string(m_mt_blocks_processing.size())
-		+ " ,m_ok_local_dag_promises:" + std::to_string(m_ok_local_promises.size())
-		+ " ,ok:" + std::to_string(block_processor_add)
-		+ ", invalid:" + std::to_string(InvalidBlockCache.size())
-		+ ", block arrival: " + std::to_string(BlockArrival.arrival.size())
-		+ ", dag_old_size: " + std::to_string(dag_old_size)
-		+ ", base_validate_old_size: " + std::to_string(base_validate_old_size)
-		;
+	std::ostringstream str;
+	str << "m_blocks_pending:" << m_blocks_pending.size()
+		<< " ,m_local_blocks_pending:" << m_local_blocks_pending.size()
+		<< " ,m_mt_blocks_pending:" << m_mt_blocks_pending.size()
+		<< " ,m_mt_blocks_processing:" << m_mt_blocks_processing.size()
+		<< " ,m_ok_local_dag_promises:" << m_ok_local_promises.size()
+		<< " ,ok:" << block_processor_add
+		<< ", invalid:" << InvalidBlockCache.size()
+		<< ", block arrival: " << BlockArrival.arrival.size()
+		<< ", dag_old_size: " << dag_old_size
+		<< ", base_validate_old_size: " << base_validate_old_size;
 
-	return str;
+	return str.str();
 }
 
 void mcp::block_processor::ongoing_retry_late_message()

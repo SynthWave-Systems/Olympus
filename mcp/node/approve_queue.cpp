@@ -1,6 +1,7 @@
 #include "approve_queue.hpp"
 #include <mcp/core/genesis.hpp>
 #include <thread>
+#include <sstream>
 
 namespace mcp
 {
@@ -322,19 +323,20 @@ namespace mcp
 	std::string ApproveQueue::getInfo()
 	{
 		UpgradableGuard l(m_lock);
-		std::string str = "ApproveQueue all:" + std::to_string(all.size())
-			+ " ,m_unverified:" + std::to_string(m_unverified.size())
-			+ " ,m_known:" + std::to_string(m_known.size())
-			+ " ,m_dropped:" + std::to_string(m_dropped.size());
+		std::ostringstream str;
+		str << "ApproveQueue all:" << all.size()
+			<< " ,m_unverified:" << m_unverified.size()
+			<< " ,m_known:" << m_known.size()
+			<< " ,m_dropped:" << m_dropped.size();
 		if(queue.size() > 0){
-			str += " current[";
-			for(auto current : queue){
-				str += " epoch:" + std::to_string(current.first) + " size=" + std::to_string(current.second.size()); 
+			str << " current[";
+			for(auto const& current : queue){
+				str << " epoch:" << current.first << " size=" << current.second.size(); 
 			}
-			str += " ]";
+			str << " ]";
 		}
 		
 
-		return str;
+		return str.str();
 	}
 }

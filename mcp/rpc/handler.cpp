@@ -5,6 +5,7 @@
 #include <mcp/core/param.hpp>
 #include <mcp/common/pwd.hpp>
 #include <mcp/node/evm/Executive.hpp>
+#include <sstream>
 //#include <mcp/node/debug.hpp>
 //#include <mcp/node/tracers/OpCode.hpp>
 
@@ -482,7 +483,7 @@ void mcp::rpc_handler::peers(mcp::json &j_response, bool &)
 	//j_response["result"] = peers_l;
 	mcp::json peers_l = mcp::json::array();
 	auto peers = client()->peers();
-	for (auto i : peers)
+	for (auto const& i : peers)
 	{
 		mcp::json peer_l;
 		peer_l["id"] = toJS(i.first);
@@ -1560,7 +1561,9 @@ void mcp::rpc_handler::personal_ecRecover(mcp::json &j_response, bool &)
 dev::h256 mcp::rpc_handler::get_eth_signed_msg(dev::bytes &data)
 {
 	dev::bytes msg;
-	std::string prefix = "Ethereum Signed Message:\n" + std::to_string(data.size());
+	std::ostringstream prefix_stream;
+	prefix_stream << "Ethereum Signed Message:\n" << data.size();
+	std::string prefix = prefix_stream.str();
 	msg.resize(prefix.size() + data.size() + 1);
 
 	msg[0] = 0x19;
